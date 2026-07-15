@@ -1,0 +1,2445 @@
+/**
+ * Storybook chrome — faithful port of docs/design/preview.html v1.1
+ * Tokens and layout mirror the mockup (软糖绘本).
+ */
+
+/* ========== Exact v1.1 tokens ========== */
+html[data-design-chrome="storybook"] {
+  --rl-paper: #fff6ec;
+  --rl-paper-deep: #f0e4d4;
+  --rl-ink: #1a2332;
+  --rl-ink-soft: #5c6678;
+  --rl-line: #e5d5c3;
+  --rl-coral: #ff6a45;
+  --rl-coral-deep: #e24f2c;
+  --rl-sun: #f0b429;
+  --rl-mint: #2bb673;
+  --rl-sky: #4c9fe0;
+  --rl-plum: #8b7cff;
+  --rl-selection: #e9822b;
+  --rl-selection-deep: #a65313;
+  --rl-selection-bg: #fff1df;
+  --rl-selection-line: #f2ad72;
+  --rl-selection-ring: rgba(233, 130, 43, 0.2);
+  --rl-peach: #ffb48a;
+  --rl-ok-bg: #e3f8ec;
+  --rl-warn-bg: #fff4d1;
+  --rl-bad-bg: #ffe8e1;
+  --rl-info-bg: #e5f3ff;
+  --rl-white: #fffcfa;
+  --radius-card: 28px;
+  --radius-control: 20px;
+  --kid-chunky: 0 6px 0 rgba(26, 35, 50, 0.07);
+  --kid-chunky-coral: 0 6px 0 rgba(226, 79, 44, 0.22);
+  --shadow-soft: 0 12px 32px rgba(26, 35, 50, 0.08);
+
+  /* Map app tokens → v1.1 (when storybook is on, any color theme still feels clean) */
+  --page-bg:
+    radial-gradient(circle 280px at 8% 12%, rgba(255, 106, 69, 0.14), transparent 70%),
+    radial-gradient(circle 320px at 92% 8%, rgba(139, 124, 255, 0.12), transparent 70%),
+    radial-gradient(circle 260px at 70% 90%, rgba(43, 182, 115, 0.1), transparent 70%),
+    var(--rl-paper);
+  --surface: rgba(255, 252, 250, 0.94);
+  --surface-strong: var(--rl-white);
+  --surface-soft: rgba(255, 237, 230, 0.72);
+  --surface-tint: #ffe8e1;
+  --border: var(--rl-line);
+  --text: var(--rl-ink);
+  --muted: var(--rl-ink-soft);
+  --primary: var(--rl-coral);
+  --primary-strong: var(--rl-coral-deep);
+  --primary-soft: var(--rl-bad-bg);
+  --accent: var(--rl-sky);
+  --accent-soft: var(--rl-info-bg);
+  --warning: var(--rl-sun);
+  --warning-soft: var(--rl-warn-bg);
+  --success: var(--rl-mint);
+  --success-soft: var(--rl-ok-bg);
+  --danger: var(--rl-coral-deep);
+  --danger-soft: var(--rl-bad-bg);
+  --shadow-card: var(--shadow-soft);
+}
+
+html[data-design-chrome="storybook"] body {
+  font-family: "Nunito", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--page-bg);
+  color: var(--rl-ink);
+}
+
+/* ========== Child shell ========== */
+html[data-design-chrome="storybook"] .child-shell {
+  width: min(1100px, 100%);
+  height: 100dvh;
+  min-height: 0;
+  padding: 14px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+html[data-design-chrome="storybook"] .ui-layout-switcher {
+  color: var(--rl-coral-deep, var(--primary-strong));
+  background: linear-gradient(180deg, #fff, #fff4ee);
+}
+
+html[data-design-chrome="storybook"] .child-brand-mark,
+html[data-design-chrome="storybook"] .child-profile-chip,
+html[data-design-chrome="storybook"] .child-points-chip {
+  border: 2px solid var(--rl-line);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.05);
+  font-weight: 800;
+  background: var(--rl-white);
+}
+
+html[data-design-chrome="storybook"] .child-player-topbar {
+  flex: 0 0 auto;
+  margin-bottom: 12px;
+}
+
+html[data-design-chrome="storybook"] .child-brand-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #fff, var(--rl-bad-bg));
+  color: var(--rl-coral-deep);
+  box-shadow: var(--kid-chunky);
+}
+
+html[data-design-chrome="storybook"] .child-profile-chip span {
+  background: linear-gradient(145deg, #ff8a70, var(--rl-coral));
+}
+
+html[data-design-chrome="storybook"] .theme-switcher,
+html[data-design-chrome="storybook"] .language-switcher,
+html[data-design-chrome="storybook"] .ghost-button.handback-button,
+html[data-design-chrome="storybook"] .ui-device-preview-button {
+  border-radius: 999px;
+  border: 2px solid var(--rl-line);
+  background: var(--rl-white);
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.05);
+  font-weight: 800;
+  color: var(--rl-ink);
+}
+
+html[data-design-chrome="storybook"] .theme-switcher,
+html[data-design-chrome="storybook"] .language-switcher {
+  color: var(--rl-coral-deep);
+  background: linear-gradient(180deg, #fff, #fff4ee);
+}
+
+html[data-design-chrome="storybook"] .ui-device-preview-button {
+  min-height: 42px;
+  padding: 0 14px;
+  color: var(--rl-selection-deep);
+  background: linear-gradient(180deg, #fff, var(--rl-selection-bg));
+}
+
+html[data-design-chrome="storybook"] .ui-theme-switcher-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ========== Device board (left + stage) ========== */
+html[data-design-chrome="storybook"] .child-learning-layout {
+  display: grid;
+  grid-template-columns: clamp(248px, 25vw, 276px) minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  border: 3px solid var(--rl-line);
+  border-radius: 32px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle 180px at 100% 0%, rgba(255, 180, 138, 0.25), transparent 60%),
+    radial-gradient(circle 160px at 0% 100%, rgba(139, 124, 255, 0.12), transparent 55%),
+    #fff8f0;
+  box-shadow: var(--kid-chunky), var(--shadow-soft);
+}
+
+/* ========== Left rail — clean books + progress ========== */
+html[data-design-chrome="storybook"] .child-left-rail {
+  position: static;
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  border-right: 3px solid var(--rl-line);
+  background: rgba(255, 252, 250, 0.92);
+  padding: 0;
+  gap: 0;
+  align-self: stretch;
+}
+
+html[data-design-chrome="storybook"] .child-left-rail::-webkit-scrollbar {
+  width: 5px;
+  height: 0;
+}
+
+html[data-design-chrome="storybook"] .child-left-rail::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html[data-design-chrome="storybook"] .child-left-rail::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: transparent;
+}
+
+html[data-design-chrome="storybook"] .child-left-rail:hover {
+  scrollbar-color: rgba(233, 130, 43, 0.42) transparent;
+}
+
+html[data-design-chrome="storybook"] .child-left-rail:hover::-webkit-scrollbar-thumb {
+  background: rgba(233, 130, 43, 0.42);
+}
+
+html[data-design-chrome="storybook"] .sb-reading-pane::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+html[data-design-chrome="storybook"] .practice-books-card,
+html[data-design-chrome="storybook"] .merged-practice-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 16px 12px 18px;
+  gap: 10px;
+  align-content: start;
+  height: auto;
+  min-height: 100%;
+}
+
+html[data-design-chrome="storybook"] .child-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 4px 10px;
+  color: var(--rl-ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+html[data-design-chrome="storybook"] .child-panel-title svg {
+  display: none; /* mockup title is text-only */
+}
+
+html[data-design-chrome="storybook"] .child-panel-title strong {
+  flex: none;
+  color: var(--rl-ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* v1.1 has no status chips */
+html[data-design-chrome="storybook"] .task-status-tabs {
+  display: none !important;
+}
+
+/* ---- Practice book cards (mockup .book-item) ---- */
+html[data-design-chrome="storybook"] .practice-book-tree {
+  gap: 10px;
+}
+
+html[data-design-chrome="storybook"] .practice-book-tree-section {
+  gap: 8px;
+}
+
+/* Mockup book card: cover | title+count | chevron, progress under title */
+html[data-design-chrome="storybook"] .practice-book-mini {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 18px;
+  grid-template-areas:
+    "cover title icon"
+    "cover meta icon"
+    "cover bar bar";
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  border-radius: 22px;
+  border: 3px solid var(--rl-line);
+  background: var(--rl-white);
+  box-shadow: 0 4px 0 rgba(26, 35, 50, 0.05);
+  font-weight: 800;
+  text-align: left;
+  color: var(--rl-ink);
+}
+
+html[data-design-chrome="storybook"] .practice-book-mini:hover {
+  border-color: color-mix(in srgb, var(--rl-line) 65%, var(--rl-selection-line));
+  background: linear-gradient(180deg, #fff, #faf8ff);
+  box-shadow: 0 6px 0 rgba(26, 35, 50, 0.07);
+  transform: none;
+}
+
+html[data-design-chrome="storybook"] .practice-book-mini.selected {
+  border-color: var(--rl-selection-line);
+  background: linear-gradient(180deg, #fff, var(--rl-selection-bg));
+  box-shadow: 0 0 0 4px var(--rl-selection-ring), 0 6px 0 rgba(89, 77, 196, 0.12);
+}
+
+html[data-design-chrome="storybook"] .practice-book-mini.selected strong {
+  color: var(--rl-selection-deep);
+}
+
+/* Soft candy book spines — only book covers (v1.1) */
+html[data-design-chrome="storybook"] .book-cover,
+html[data-design-chrome="storybook"] .ui-book-cover {
+  grid-area: cover;
+  width: 42px;
+  height: 50px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: #fff !important;
+  font-weight: 800;
+  font-size: 18px;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.08);
+  background: linear-gradient(160deg, #ff8a70, #ff6a45 55%, #ffb48a) !important;
+}
+
+html[data-design-chrome="storybook"] .practice-book-tree-section:nth-child(2n) .book-cover {
+  background: linear-gradient(160deg, #a99bff, #8b7cff 55%, #c4b8ff) !important;
+}
+
+html[data-design-chrome="storybook"] .practice-book-tree-section:nth-child(3n) .book-cover {
+  background: linear-gradient(160deg, #6ec8ff, #4c9fe0 55%, #9fd4ff) !important;
+}
+
+html[data-design-chrome="storybook"] .practice-book-mini strong {
+  grid-area: title;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-design-chrome="storybook"] .practice-book-mini em {
+  grid-area: meta;
+  margin: 0;
+  color: var(--rl-ink-soft);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+html[data-design-chrome="storybook"] .book-expand-icon {
+  grid-area: icon;
+  justify-self: end;
+  color: var(--rl-ink-soft);
+  width: 16px;
+  height: 16px;
+}
+
+html[data-design-chrome="storybook"] .practice-book-mini .practice-progress-bar,
+html[data-design-chrome="storybook"] .practice-book-mini .ui-progress {
+  grid-area: bar;
+  display: block;
+  width: 100%;
+  height: 8px;
+  margin: 4px 0 0;
+  border-radius: 99px;
+  border: 2px solid rgba(26, 35, 50, 0.04);
+  background: var(--rl-paper-deep);
+  overflow: hidden;
+}
+
+html[data-design-chrome="storybook"] .practice-book-mini .practice-progress-bar > span,
+html[data-design-chrome="storybook"] .practice-book-mini .practice-progress-bar > i,
+html[data-design-chrome="storybook"] .practice-book-mini .ui-progress > i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #5ed99a, var(--rl-mint));
+}
+
+/* ---- Nested course tree → “本课进度” list feel ---- */
+html[data-design-chrome="storybook"] .practice-book-lesson-list {
+  padding-left: 4px;
+  gap: 4px;
+}
+
+html[data-design-chrome="storybook"] .practice-book-lesson-list::before {
+  content: "本课进度";
+  display: block;
+  padding: 8px 10px 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--rl-ink-soft);
+  letter-spacing: 0.04em;
+}
+
+/* Course row: small status dot instead of big colorful thumb */
+html[data-design-chrome="storybook"] .task-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  grid-template-columns: none;
+  color: var(--rl-ink-soft);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+html[data-design-chrome="storybook"] .task-preview-row:hover {
+  transform: none;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* Selection is amber orange; coral remains reserved for recording/errors/actions. */
+html[data-design-chrome="storybook"] .task-preview-row.active {
+  background: linear-gradient(180deg, #fff, var(--rl-selection-bg));
+  border-color: var(--rl-selection-line);
+  color: var(--rl-ink);
+  box-shadow: 0 3px 0 rgba(89, 77, 196, 0.12);
+}
+
+html[data-design-chrome="storybook"] .task-preview-row.completed {
+  color: #178a54;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html[data-design-chrome="storybook"] .task-thumb {
+  width: 12px !important;
+  height: 12px !important;
+  min-width: 12px;
+  border-radius: 50% !important;
+  border: 2px solid #fff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  font-size: 0 !important;
+  color: transparent !important;
+  background: var(--rl-line) !important;
+  flex-shrink: 0;
+}
+
+html[data-design-chrome="storybook"] .task-preview-row.active .task-thumb {
+  background: var(--rl-selection) !important;
+  box-shadow: 0 0 0 4px var(--rl-selection-ring);
+}
+
+html[data-design-chrome="storybook"] .task-preview-row.completed .task-thumb {
+  background: var(--rl-mint) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+html[data-design-chrome="storybook"] .task-preview-row > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+html[data-design-chrome="storybook"] .task-preview-row strong {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+html[data-design-chrome="storybook"] .task-preview-row.active strong {
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+html[data-design-chrome="storybook"] .task-preview-row small,
+html[data-design-chrome="storybook"] .task-preview-row em {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rl-ink-soft);
+}
+
+html[data-design-chrome="storybook"] .task-preview-row .practice-progress-bar,
+html[data-design-chrome="storybook"] .task-preview-row .ui-progress {
+  display: none;
+}
+
+html[data-design-chrome="storybook"] .task-preview-row .practice-tree-chevron {
+  color: var(--rl-ink-soft);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Chapter / section — same list language */
+html[data-design-chrome="storybook"] .practice-course-outline,
+html[data-design-chrome="storybook"] .practice-section-tree {
+  border-left: none;
+  margin-left: 8px;
+  padding-left: 4px;
+  gap: 4px;
+}
+
+html[data-design-chrome="storybook"] .practice-chapter-toggle,
+html[data-design-chrome="storybook"] .practice-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  grid-template-columns: none;
+  color: var(--rl-ink-soft);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+html[data-design-chrome="storybook"] .practice-chapter-toggle:hover,
+html[data-design-chrome="storybook"] .practice-section-toggle:hover {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: transparent;
+}
+
+html[data-design-chrome="storybook"] .practice-chapter-toggle.active,
+html[data-design-chrome="storybook"] .practice-section-toggle.active {
+  background: linear-gradient(180deg, #fff, var(--rl-selection-bg));
+  border-color: var(--rl-selection-line);
+  color: var(--rl-ink);
+  box-shadow: 0 3px 0 rgba(89, 77, 196, 0.12);
+}
+
+html[data-design-chrome="storybook"] .practice-chapter-toggle.active .practice-tree-copy strong,
+html[data-design-chrome="storybook"] .practice-section-toggle.active .practice-section-label-row strong {
+  color: var(--rl-selection-deep);
+}
+
+/* Chapter index → status dot */
+html[data-design-chrome="storybook"] .practice-chapter-index {
+  width: 12px !important;
+  height: 12px !important;
+  min-width: 12px;
+  border-radius: 50% !important;
+  border: 2px solid #fff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  font-size: 0 !important;
+  color: transparent !important;
+  background: var(--rl-line) !important;
+  flex-shrink: 0;
+}
+
+html[data-design-chrome="storybook"] .practice-chapter-toggle.active .practice-chapter-index {
+  background: var(--rl-selection) !important;
+  box-shadow: 0 0 0 4px var(--rl-selection-ring);
+}
+
+html[data-design-chrome="storybook"] .practice-tree-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+html[data-design-chrome="storybook"] .practice-tree-copy strong {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-design-chrome="storybook"] .practice-tree-copy small {
+  font-size: 11px;
+  color: var(--rl-ink-soft);
+}
+
+html[data-design-chrome="storybook"] .practice-section-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+html[data-design-chrome="storybook"] .practice-section-label-row {
+  flex-wrap: nowrap;
+}
+
+html[data-design-chrome="storybook"] .practice-section-label-row strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-design-chrome="storybook"] .practice-section-toggle.active .practice-section-label-row {
+  align-items: flex-start;
+}
+
+html[data-design-chrome="storybook"] .practice-section-toggle.active .practice-section-label-row strong {
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+html[data-design-chrome="storybook"] .practice-section-label-row i {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--rl-line);
+  background: var(--rl-white);
+  color: var(--rl-ink-soft);
+  font-size: 10px;
+  font-weight: 800;
+  font-style: normal;
+  padding: 2px 6px;
+}
+
+html[data-design-chrome="storybook"] .practice-section-toggle em,
+html[data-design-chrome="storybook"] .practice-chapter-toggle + * {
+  font-size: 11px;
+  color: var(--rl-ink-soft);
+}
+
+html[data-design-chrome="storybook"] .practice-section-toggle em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--rl-ink-soft);
+}
+
+/* Sentence list — compact */
+html[data-design-chrome="storybook"] .practice-sentence-tree {
+  gap: 2px;
+  margin-left: 6px;
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rl-ink-soft);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item.active {
+  background: linear-gradient(90deg, var(--rl-selection-bg), #faf9ff);
+  color: var(--rl-ink);
+  box-shadow: inset 3px 0 0 var(--rl-selection);
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item.done {
+  color: #178a54;
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-state {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 0;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--rl-ink-soft);
+  background: var(--rl-paper-deep);
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item.active .practice-sentence-state {
+  color: #fff;
+  background: var(--rl-selection);
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item.done .practice-sentence-state {
+  color: #fff;
+  background: var(--rl-mint);
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item > span:not(.practice-sentence-state) {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item > span:not(.practice-sentence-state) small {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #7d694f;
+  background: #fff0cf;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item.optional:not(.active) .practice-sentence-state {
+  color: #a9783d;
+  background: #fff0cf;
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item.active > span:not(.practice-sentence-state) {
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item > em {
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  color: var(--rl-ink-soft);
+}
+
+/* ========== Right reading pane ========== */
+html[data-design-chrome="storybook"] .sb-reading-pane.child-reading-stage {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  min-height: 100%;
+  overflow: auto;
+  scrollbar-width: none;
+  container-name: reading-pane;
+  container-type: inline-size;
+}
+
+@container reading-pane (max-width: 520px) {
+  html[data-design-chrome="storybook"] .sb-stage-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-toolbar .ui-voice-pill,
+  html[data-design-chrome="storybook"] .sb-stage-toolbar .compact-voice-picker {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-toolbar select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+html[data-design-chrome="storybook"] .sb-crumb {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: min(100%, 420px);
+  border-radius: 999px;
+  border: 2px solid var(--rl-line);
+  background: rgba(255, 255, 255, 0.75);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rl-ink-soft);
+  box-shadow: none;
+}
+
+html[data-design-chrome="storybook"] .sb-crumb strong {
+  color: var(--rl-ink);
+  font-weight: 800;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .ui-voice-pill,
+html[data-design-chrome="storybook"] .sb-stage-toolbar .compact-voice-picker {
+  border-radius: 999px !important;
+  border: 2px solid var(--rl-line) !important;
+  background: var(--rl-white) !important;
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.05);
+  font-weight: 800;
+  font-size: 12px;
+  min-height: 40px;
+  color: var(--rl-ink);
+}
+
+/* Stage bubble */
+html[data-design-chrome="storybook"] .sb-stage-bubble.ui-stage-card,
+html[data-design-chrome="storybook"] .sb-stage-bubble.sentence-stage-card {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 240px;
+  view-transition-name: active-reading-card;
+  border: 3px solid var(--rl-line);
+  border-radius: 36px;
+  padding: 32px 22px 22px;
+  background: var(--rl-white);
+  box-shadow: var(--kid-chunky), 0 16px 40px rgba(255, 106, 69, 0.08);
+  gap: 0;
+  align-content: center;
+}
+
+html[data-design-chrome="storybook"] .practice-sentence-tree-item[aria-current="true"] {
+  view-transition-name: active-practice-sentence;
+}
+
+::view-transition-old(active-reading-card),
+::view-transition-old(active-practice-sentence) {
+  animation: reading-view-out 160ms ease-in both;
+}
+
+::view-transition-new(active-reading-card),
+::view-transition-new(active-practice-sentence) {
+  animation: reading-view-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes reading-view-out {
+  to {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.99);
+  }
+}
+
+@keyframes reading-view-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px) scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(active-reading-card),
+  ::view-transition-new(active-reading-card),
+  ::view-transition-old(active-practice-sentence),
+  ::view-transition-new(active-practice-sentence) {
+    animation: none;
+  }
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble.ui-stage-card--pass {
+  border-color: rgba(43, 182, 115, 0.55);
+  box-shadow: 0 0 0 6px rgba(43, 182, 115, 0.12), var(--kid-chunky);
+  background: linear-gradient(180deg, #fff, #f3fcf7);
+}
+
+html[data-design-chrome="storybook"] .ui-stage-card__dots {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+html[data-design-chrome="storybook"] .ui-stage-card__dots i {
+  display: block;
+  border-radius: 50%;
+}
+
+html[data-design-chrome="storybook"] .ui-stage-card__dots i:first-child {
+  width: 28px;
+  height: 28px;
+  background: radial-gradient(circle at 30% 30%, #fff 0 28%, var(--rl-peach) 30% 100%);
+  border: 2px solid rgba(255, 106, 69, 0.2);
+  opacity: 0.9;
+}
+
+html[data-design-chrome="storybook"] .ui-stage-card__dots i:last-child {
+  width: 18px;
+  height: 18px;
+  background: var(--rl-mint);
+  opacity: 0.35;
+}
+
+html[data-design-chrome="storybook"] .ui-stage-card__badge {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 2;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 106, 69, 0.25);
+  padding: 6px 12px;
+  color: var(--rl-coral-deep);
+  background: #ffe8e1;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+html[data-design-chrome="storybook"] .ui-stage-card--pass .ui-stage-card__badge {
+  color: #178a54;
+  background: var(--rl-ok-bg);
+  border-color: rgba(43, 182, 115, 0.3);
+}
+
+html[data-design-chrome="storybook"] .sb-stage-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+html[data-design-chrome="storybook"] .sb-word-study-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(460px, 92%);
+  padding: 24px 32px;
+  border: 3px solid rgba(255, 141, 92, 0.38);
+  border-radius: 28px;
+  background: linear-gradient(180deg, #fffaf5, #fff2e9);
+  box-shadow: 0 8px 0 rgba(228, 151, 112, 0.16);
+  text-align: center;
+}
+
+html[data-design-chrome="storybook"] .sb-word-study-card.optional {
+  border-color: rgba(225, 178, 90, 0.4);
+  background: linear-gradient(180deg, #fffdf4, #fff5d9);
+}
+
+html[data-design-chrome="storybook"] .sb-word-study-kind {
+  align-self: flex-start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: var(--rl-coral-deep);
+  background: #ffe5da;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+html[data-design-chrome="storybook"] .sb-word-study-card.optional .sb-word-study-kind {
+  color: #93642b;
+  background: #ffebba;
+}
+
+html[data-design-chrome="storybook"] .sb-word-study-card > strong {
+  margin-top: 12px;
+  color: var(--rl-ink);
+  font-family: "Nunito", "PingFang SC", sans-serif;
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  line-height: 1.08;
+  font-weight: 900;
+}
+
+html[data-design-chrome="storybook"] .sb-word-study-card > em {
+  margin-top: 9px;
+  color: #5d7185;
+  font-family: "Nunito", sans-serif;
+  font-size: clamp(1rem, 2.5vw, 1.35rem);
+  font-style: normal;
+  font-weight: 800;
+}
+
+html[data-design-chrome="storybook"] .sb-word-study-card > p {
+  margin: 12px 0 0;
+  color: #5b4638;
+  font-size: clamp(1rem, 2.4vw, 1.3rem);
+  font-weight: 800;
+}
+
+html[data-design-chrome="storybook"] .sb-reading-passage {
+  width: min(650px, 94%);
+  padding: 16px 18px 18px;
+  border: 3px solid rgba(224, 183, 143, 0.5);
+  border-radius: 24px;
+  background: linear-gradient(180deg, #fffdf9, #fff8ef);
+  box-shadow: 0 7px 0 rgba(174, 121, 77, 0.12);
+}
+
+html[data-design-chrome="storybook"] .sb-reading-passage > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #80552f;
+}
+
+html[data-design-chrome="storybook"] .sb-reading-passage > header strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+html[data-design-chrome="storybook"] .sb-reading-passage > header span {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #ffe4d5;
+  color: var(--rl-coral-deep);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+html[data-design-chrome="storybook"] .sb-reading-passage-lines {
+  display: grid;
+  gap: 5px;
+  max-height: 245px;
+  margin-top: 12px;
+  padding-right: 5px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+html[data-design-chrome="storybook"] .sb-reading-passage-lines p {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 12px;
+  color: #675b52;
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+html[data-design-chrome="storybook"] .sb-reading-passage-lines p.active {
+  color: var(--rl-ink);
+  background: linear-gradient(90deg, #ffe1d3, #fff0df);
+  box-shadow: inset 4px 0 0 var(--rl-coral);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .live-sentence-text,
+html[data-design-chrome="storybook"] .sb-stage-bubble .karaoke-sentence,
+html[data-design-chrome="storybook"] .sb-stage-bubble .sentence-text {
+  margin: 0;
+  max-width: 18ch;
+  text-align: center;
+  font-family: "Nunito", "PingFang SC", sans-serif;
+  font-size: clamp(2rem, 4.5vw, 2.65rem);
+  line-height: 1.35;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+  color: var(--rl-ink);
+}
+
+/* Actions: 听原音 · 录音 · 下一句 */
+html[data-design-chrome="storybook"] .sb-stage-bubble .stage-record-controls,
+html[data-design-chrome="storybook"] .sb-stage-bubble .ui-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  margin: 0;
+  grid-template-columns: none;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .listen-button,
+html[data-design-chrome="storybook"] .sb-stage-bubble .ui-btn--listen {
+  min-height: 48px;
+  min-width: 112px;
+  border-radius: 999px;
+  border: 3px solid rgba(76, 159, 224, 0.35);
+  background: var(--rl-info-bg);
+  color: #2a6fa8;
+  box-shadow: 0 5px 0 rgba(76, 159, 224, 0.18);
+  font-weight: 800;
+  font-size: 15px;
+  padding: 0 20px;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .next-stage-button,
+html[data-design-chrome="storybook"] .sb-stage-bubble .ui-btn--next {
+  min-height: 48px;
+  min-width: 112px;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  background: linear-gradient(180deg, #ff8a70, var(--rl-coral));
+  color: #fff;
+  box-shadow: var(--kid-chunky-coral);
+  font-weight: 800;
+  font-size: 15px;
+  padding: 0 20px;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .ui-btn--next-disabled,
+html[data-design-chrome="storybook"] .sb-stage-bubble .ui-btn--ghost.ui-btn--pill:disabled {
+  min-height: 48px;
+  min-width: 100px;
+  border-radius: 999px;
+  border: 3px solid var(--rl-line);
+  background: var(--rl-paper-deep);
+  color: var(--rl-ink-soft);
+  box-shadow: 0 5px 0 rgba(26, 35, 50, 0.06);
+  opacity: 1;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .ui-record-orb,
+html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button {
+  width: 96px;
+  height: 96px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #ff8a70, var(--rl-coral) 50%, var(--rl-coral-deep));
+  box-shadow:
+    0 0 0 4px rgba(255, 106, 69, 0.25),
+    0 10px 0 rgba(226, 79, 44, 0.28),
+    0 16px 28px rgba(255, 106, 69, 0.25);
+  font-weight: 800;
+  font-size: 13px;
+  color: #fff;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button:not(.recording):not(:disabled)::before,
+html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button:not(.recording):not(:disabled)::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 106, 69, 0.35);
+  animation: sb-orb-pulse 1.5s ease-out infinite;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button:not(.recording):not(:disabled)::before {
+  inset: -10px;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button:not(.recording):not(:disabled)::after {
+  inset: -18px;
+  border-width: 2px;
+  animation-delay: 0.35s;
+  opacity: 0.6;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button.recording {
+  background: linear-gradient(160deg, #ff8a70, var(--rl-coral-deep));
+}
+
+html[data-design-chrome="storybook"] .sb-stage-bubble .listen-button:active:not(:disabled),
+html[data-design-chrome="storybook"] .sb-stage-bubble .next-stage-button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 rgba(76, 159, 224, 0.18);
+}
+
+@keyframes sb-orb-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+/* Hist bar */
+html[data-design-chrome="storybook"] .sb-hist-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 3px dashed var(--rl-line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rl-ink-soft);
+}
+
+html[data-design-chrome="storybook"] .sb-hist-bar__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--rl-ink);
+  font-weight: 800;
+}
+
+html[data-design-chrome="storybook"] .sb-hist-bar__left em {
+  font-style: normal;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  padding: 3px 10px;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+html[data-design-chrome="storybook"] .sb-hist-bar__left em.pending {
+  background: var(--rl-warn-bg);
+  border-color: rgba(240, 180, 41, 0.35);
+  color: #9a6b00;
+}
+
+html[data-design-chrome="storybook"] .sb-hist-bar__left em.ok {
+  background: var(--rl-ok-bg);
+  border-color: rgba(43, 182, 115, 0.25);
+  color: #178a54;
+}
+
+html[data-design-chrome="storybook"] .sb-hist-bar__right {
+  color: var(--rl-ink-soft);
+  font-weight: 700;
+}
+
+/* Feedback dock */
+html[data-design-chrome="storybook"] .sb-feedback-dock {
+  display: grid;
+  gap: 10px;
+}
+
+html[data-design-chrome="storybook"] .sb-feedback-dock .ui-score-panel,
+html[data-design-chrome="storybook"] .sb-feedback-dock .stage-score-row {
+  border: 2px solid var(--rl-line);
+  border-radius: 22px;
+  background: var(--rl-white);
+  box-shadow: 0 4px 0 rgba(26, 35, 50, 0.04);
+}
+
+html[data-design-chrome="storybook"] .sb-feedback-dock .ui-metric,
+html[data-design-chrome="storybook"] .sb-feedback-dock .metric {
+  border-radius: 16px;
+  border: 2px solid var(--rl-line);
+  background: #fff8f0;
+  padding: 10px 12px;
+  font-weight: 800;
+}
+
+html[data-design-chrome="storybook"] .ui-word-chip,
+html[data-design-chrome="storybook"] .word-pill {
+  border-radius: 16px;
+  border: 3px solid transparent;
+  padding: 8px 12px;
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.05);
+  font-weight: 800;
+}
+
+html[data-design-chrome="storybook"] .ui-word-chip--ok,
+html[data-design-chrome="storybook"] .word-pill.passed {
+  background: var(--rl-ok-bg);
+  border-color: rgba(43, 182, 115, 0.35);
+  color: #178a54;
+}
+
+html[data-design-chrome="storybook"] .ui-word-chip--bad,
+html[data-design-chrome="storybook"] .word-pill.misread,
+html[data-design-chrome="storybook"] .word-pill.unclear {
+  background: var(--rl-warn-bg);
+  border-color: rgba(240, 180, 41, 0.55);
+  border-bottom-style: dashed;
+  color: #9a6b00;
+}
+
+html[data-design-chrome="storybook"] .ui-word-chip--miss,
+html[data-design-chrome="storybook"] .word-pill.missed {
+  background: var(--rl-bad-bg);
+  border-color: rgba(255, 106, 69, 0.4);
+  color: var(--rl-coral-deep);
+  text-decoration: none;
+}
+
+html[data-design-chrome="storybook"] .ui-status-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 18px;
+  border: 2px solid transparent;
+  padding: 12px 14px;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+html[data-design-chrome="storybook"] .ui-status-banner--warn {
+  border-color: rgba(240, 180, 41, 0.4);
+  background: var(--rl-warn-bg);
+  color: #8a6200;
+}
+
+html[data-design-chrome="storybook"] .ui-status-banner--bad {
+  border-color: rgba(255, 106, 69, 0.3);
+  background: var(--rl-bad-bg);
+  color: var(--rl-coral-deep);
+}
+
+html[data-design-chrome="storybook"] .ui-empty-practice {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 48px 24px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--rl-ink-soft);
+}
+
+/* ========== Parent console — same soft-candy storybook family ========== */
+html[data-design-chrome="storybook"] .admin-shell {
+  --radius-card: 24px;
+  --radius-control: 15px;
+  width: min(1480px, 100%);
+  min-height: 100dvh;
+  padding: 18px clamp(12px, 2vw, 28px) 28px;
+}
+
+html[data-design-chrome="storybook"] .admin-app-frame {
+  min-height: calc(100dvh - 46px);
+  grid-template-columns: 214px minmax(0, 1fr);
+  border: 3px solid var(--rl-line);
+  border-radius: 30px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle 240px at 96% 4%, rgba(255, 180, 138, 0.2), transparent 65%),
+    radial-gradient(circle 230px at 8% 94%, rgba(43, 182, 115, 0.09), transparent 66%),
+    #fff8f0;
+  box-shadow: var(--kid-chunky), 0 22px 60px rgba(95, 69, 44, 0.12);
+}
+
+html[data-design-chrome="storybook"] .admin-sidebar {
+  position: relative;
+  isolation: isolate;
+  grid-template-rows: max-content 1fr;
+  gap: 20px;
+  border-right: 3px solid var(--rl-line);
+  padding: 20px 14px;
+  color: var(--rl-ink);
+  background:
+    radial-gradient(circle 150px at -20% 0%, rgba(255, 180, 138, 0.35), transparent 68%),
+    linear-gradient(180deg, rgba(255, 252, 250, 0.98), rgba(255, 246, 236, 0.96));
+}
+
+html[data-design-chrome="storybook"] .admin-sidebar::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -52px;
+  bottom: -38px;
+  width: 150px;
+  height: 150px;
+  border-radius: 46% 54% 58% 42%;
+  background: rgba(76, 159, 224, 0.08);
+  transform: rotate(18deg);
+}
+
+html[data-design-chrome="storybook"] .admin-brand {
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 11px;
+  padding: 2px 4px 12px;
+}
+
+html[data-design-chrome="storybook"] .admin-avatar {
+  width: 48px;
+  height: 48px;
+  border: 2px solid rgba(226, 79, 44, 0.18);
+  border-radius: 17px;
+  color: #fff;
+  background: linear-gradient(145deg, #ff8f70, var(--rl-coral));
+  box-shadow: var(--kid-chunky-coral);
+  font-size: 1rem;
+}
+
+html[data-design-chrome="storybook"] .admin-brand strong {
+  color: var(--rl-ink);
+  font-size: 1.02rem;
+  font-weight: 950;
+}
+
+html[data-design-chrome="storybook"] .admin-brand small {
+  color: var(--rl-selection-deep);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+html[data-design-chrome="storybook"] .admin-nav {
+  gap: 8px;
+}
+
+html[data-design-chrome="storybook"] .admin-nav-item {
+  min-height: 48px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  padding: 0 12px;
+  color: var(--rl-ink-soft);
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 900;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+html[data-design-chrome="storybook"] .admin-nav-item:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--rl-selection-line) 58%, var(--rl-line));
+  color: var(--rl-selection-deep);
+  background: rgba(255, 255, 255, 0.74);
+  transform: translateX(2px);
+}
+
+html[data-design-chrome="storybook"] .admin-nav-item.active {
+  border-color: var(--rl-selection-line);
+  color: var(--rl-selection-deep);
+  background: linear-gradient(135deg, #fff9f0, var(--rl-selection-bg));
+  box-shadow: 0 4px 0 var(--rl-selection-ring);
+}
+
+html[data-design-chrome="storybook"] .admin-nav-item.active svg {
+  color: var(--rl-selection);
+}
+
+html[data-design-chrome="storybook"] .admin-child-page-link {
+  margin-top: 12px;
+  border-color: rgba(43, 182, 115, 0.3);
+  color: #13794a;
+  background: linear-gradient(180deg, #fff, var(--rl-ok-bg));
+}
+
+html[data-design-chrome="storybook"] .admin-child-page-link:hover:not(:disabled) {
+  border-color: rgba(43, 182, 115, 0.48);
+  color: #0d6840;
+  background: var(--rl-ok-bg);
+}
+
+html[data-design-chrome="storybook"] .admin-workspace {
+  gap: 20px;
+  padding: 22px;
+  background:
+    linear-gradient(rgba(229, 213, 195, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(229, 213, 195, 0.14) 1px, transparent 1px),
+    rgba(255, 252, 250, 0.58);
+  background-size: 28px 28px;
+}
+
+html[data-design-chrome="storybook"] .admin-panel,
+html[data-design-chrome="storybook"] .admin-editor,
+html[data-design-chrome="storybook"] .admin-metric-card,
+html[data-design-chrome="storybook"] .admin-action-card {
+  border: 2px solid var(--rl-line);
+  border-radius: var(--radius-card);
+  background: rgba(255, 252, 250, 0.96);
+  box-shadow: var(--kid-chunky), 0 12px 28px rgba(95, 69, 44, 0.07);
+  backdrop-filter: none;
+}
+
+html[data-design-chrome="storybook"] .admin-editor {
+  padding: 22px;
+}
+
+html[data-design-chrome="storybook"] .admin-panel {
+  padding: 20px;
+}
+
+html[data-design-chrome="storybook"] .admin-page-heading {
+  gap: 7px;
+  padding: 2px 4px;
+}
+
+html[data-design-chrome="storybook"] .admin-page-heading h1,
+html[data-design-chrome="storybook"] .practice-board-heading h1 {
+  color: var(--rl-ink);
+  font-size: clamp(1.55rem, 2.2vw, 2rem);
+  font-weight: 950;
+  letter-spacing: -0.02em;
+}
+
+html[data-design-chrome="storybook"] .admin-page-heading p {
+  color: var(--rl-ink-soft);
+  line-height: 1.5;
+}
+
+html[data-design-chrome="storybook"] .admin-kicker {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: var(--rl-selection-deep);
+  background: var(--rl-selection-bg);
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+html[data-design-chrome="storybook"] .admin-section-header,
+html[data-design-chrome="storybook"] .admin-panel-header {
+  padding-bottom: 12px;
+  border-bottom: 2px dashed color-mix(in srgb, var(--rl-line) 82%, transparent);
+}
+
+html[data-design-chrome="storybook"] .content-preview-panel.collapsed .content-preview-header {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+html[data-design-chrome="storybook"] .admin-panel-section,
+html[data-design-chrome="storybook"] .chapter-editor,
+html[data-design-chrome="storybook"] .chapter-section-editor,
+html[data-design-chrome="storybook"] .settings-row {
+  border: 2px solid color-mix(in srgb, var(--rl-line) 90%, white);
+  border-radius: 19px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(255, 246, 236, 0.72));
+  box-shadow: 0 4px 0 rgba(26, 35, 50, 0.035);
+}
+
+html[data-design-chrome="storybook"] .chapter-section-editor {
+  background: rgba(255, 252, 250, 0.92);
+}
+
+html[data-design-chrome="storybook"] .admin-field input,
+html[data-design-chrome="storybook"] .admin-field select,
+html[data-design-chrome="storybook"] .admin-field textarea,
+html[data-design-chrome="storybook"] .practice-board-tools,
+html[data-design-chrome="storybook"] .practice-board-tools input,
+html[data-design-chrome="storybook"] .practice-course-filters > input,
+html[data-design-chrome="storybook"] .practice-course-filters select,
+html[data-design-chrome="storybook"] .lesson-library-filters > input,
+html[data-design-chrome="storybook"] .lesson-library-filters > select,
+html[data-design-chrome="storybook"] .practice-assignment-target select,
+html[data-design-chrome="storybook"] .practice-table-actions select,
+html[data-design-chrome="storybook"] .settings-row select,
+html[data-design-chrome="storybook"] .sentence-correction-actions select {
+  border: 2px solid var(--rl-line);
+  border-radius: var(--radius-control);
+  color: var(--rl-ink);
+  background: #fffdfa;
+  box-shadow: inset 0 1px 0 #fff;
+}
+
+html[data-design-chrome="storybook"] .admin-field input:focus,
+html[data-design-chrome="storybook"] .admin-field select:focus,
+html[data-design-chrome="storybook"] .admin-field textarea:focus,
+html[data-design-chrome="storybook"] .practice-board-tools:focus-within,
+html[data-design-chrome="storybook"] .practice-course-filters input:focus,
+html[data-design-chrome="storybook"] .practice-course-filters select:focus,
+html[data-design-chrome="storybook"] .lesson-library-filters input:focus,
+html[data-design-chrome="storybook"] .lesson-library-filters select:focus {
+  border-color: var(--rl-selection-line);
+  outline: 0;
+  box-shadow: 0 0 0 4px var(--rl-selection-ring);
+}
+
+html[data-design-chrome="storybook"] .admin-shell .admin-primary-button,
+html[data-design-chrome="storybook"] .admin-shell .admin-secondary-button,
+html[data-design-chrome="storybook"] .admin-shell .admin-link-button,
+html[data-design-chrome="storybook"] .admin-shell .icon-danger-button,
+html[data-design-chrome="storybook"] .admin-shell .sentence-action-button {
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+html[data-design-chrome="storybook"] .admin-shell .admin-primary-button {
+  border: 2px solid var(--rl-coral-deep);
+  color: #fff;
+  background: linear-gradient(180deg, #ff8061, var(--rl-coral));
+  box-shadow: 0 4px 0 rgba(226, 79, 44, 0.2);
+}
+
+html[data-design-chrome="storybook"] .admin-shell .admin-secondary-button,
+html[data-design-chrome="storybook"] .admin-shell .admin-link-button {
+  border: 2px solid var(--rl-line);
+  color: var(--rl-selection-deep);
+  background: linear-gradient(180deg, #fff, #fff7ef);
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.045);
+}
+
+html[data-design-chrome="storybook"] .admin-shell .admin-secondary-button:hover:not(:disabled),
+html[data-design-chrome="storybook"] .admin-shell .admin-link-button:hover:not(:disabled) {
+  border-color: var(--rl-selection-line);
+  color: var(--rl-selection-deep);
+  background: var(--rl-selection-bg);
+}
+
+html[data-design-chrome="storybook"] .admin-status-stack .status-text,
+html[data-design-chrome="storybook"] .admin-status-stack .error-text {
+  border: 2px solid rgba(43, 182, 115, 0.25);
+  border-radius: 16px;
+  padding: 10px 13px;
+  background: var(--rl-ok-bg);
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.035);
+}
+
+html[data-design-chrome="storybook"] .admin-status-stack .error-text {
+  border-color: rgba(226, 79, 44, 0.24);
+  background: var(--rl-bad-bg);
+}
+
+html[data-design-chrome="storybook"] .practice-board-panel {
+  container-type: inline-size;
+  padding: 20px;
+  background: rgba(255, 252, 250, 0.94);
+}
+
+html[data-design-chrome="storybook"] .practice-board-heading {
+  margin-bottom: 20px;
+}
+
+html[data-design-chrome="storybook"] .practice-board-tools {
+  border-radius: 17px;
+  padding: 5px;
+  background: #fff9f2;
+}
+
+html[data-design-chrome="storybook"] .practice-board-tools input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-design-chrome="storybook"] .practice-board-stats span {
+  min-height: 40px;
+  border: 2px solid var(--rl-line);
+  color: var(--rl-selection-deep);
+  background: var(--rl-selection-bg);
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.035);
+}
+
+html[data-design-chrome="storybook"] .practice-board-stats span:first-child {
+  border-color: rgba(240, 180, 41, 0.3);
+  color: #8a6200;
+  background: var(--rl-warn-bg);
+}
+
+html[data-design-chrome="storybook"] .practice-board-stats span:last-child {
+  border-color: rgba(43, 182, 115, 0.25);
+  color: #13794a;
+  background: var(--rl-ok-bg);
+}
+
+html[data-design-chrome="storybook"] .practice-board-grid {
+  grid-template-columns: 232px minmax(520px, 1fr);
+  gap: 14px;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+html[data-design-chrome="storybook"] .practice-books-pane,
+html[data-design-chrome="storybook"] .practice-content-pane,
+html[data-design-chrome="storybook"] .practice-course-library-pane {
+  border: 2px solid var(--rl-line);
+  border-radius: 20px;
+  padding: 15px;
+  background: rgba(255, 252, 250, 0.94);
+  box-shadow: 0 4px 0 rgba(26, 35, 50, 0.04);
+}
+
+html[data-design-chrome="storybook"] .practice-books-pane {
+  background: linear-gradient(180deg, #fffdf9, #fff5eb);
+}
+
+html[data-design-chrome="storybook"] .practice-course-library-pane {
+  grid-column: 1 / -1;
+  background: linear-gradient(180deg, #fffdf9, #f3fbf7);
+}
+
+html[data-design-chrome="storybook"] .practice-book-list-title .admin-secondary-button {
+  min-height: 44px;
+  border-color: var(--rl-selection-line);
+  color: var(--rl-selection-deep);
+  background: linear-gradient(180deg, #fff, var(--rl-selection-bg));
+}
+
+html[data-design-chrome="storybook"] .practice-book-option {
+  border: 2px solid var(--rl-line);
+  border-radius: 17px;
+  padding: 11px;
+  background: #fffdfa;
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.035);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+html[data-design-chrome="storybook"] .practice-book-option:hover {
+  border-color: var(--rl-selection-line);
+  background: #fffaf4;
+  transform: translateY(-1px);
+}
+
+html[data-design-chrome="storybook"] .practice-book-option.selected,
+html[data-design-chrome="storybook"] .practice-book-option.drop-over {
+  border-color: var(--rl-selection);
+  color: var(--rl-selection-deep);
+  background: var(--rl-selection-bg);
+  box-shadow: 0 0 0 4px var(--rl-selection-ring), 0 4px 0 rgba(166, 83, 19, 0.08);
+}
+
+html[data-design-chrome="storybook"] .practice-book-mark {
+  border: 2px solid rgba(255, 255, 255, 0.62);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #ff9a76, var(--rl-coral));
+  box-shadow: 0 4px 0 rgba(226, 79, 44, 0.16);
+}
+
+html[data-design-chrome="storybook"] .practice-course-card {
+  border: 2px solid var(--rl-line);
+  border-radius: 17px;
+  padding: 12px;
+  background: #fffdfa;
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.035);
+}
+
+html[data-design-chrome="storybook"] .practice-course-card:hover {
+  border-color: var(--rl-selection-line);
+  background: #fff9f2;
+  transform: translateY(-1px);
+}
+
+html[data-design-chrome="storybook"] .practice-course-card.selected {
+  border-color: var(--rl-selection);
+  background: var(--rl-selection-bg);
+  box-shadow: 0 0 0 4px var(--rl-selection-ring);
+}
+
+html[data-design-chrome="storybook"] .practice-course-card.added,
+html[data-design-chrome="storybook"] .practice-course-card.batch-selected {
+  border-color: rgba(43, 182, 115, 0.46);
+  background: var(--rl-ok-bg);
+  box-shadow: 0 0 0 4px rgba(43, 182, 115, 0.1);
+}
+
+html[data-design-chrome="storybook"] .practice-assignment-panel,
+html[data-design-chrome="storybook"] .practice-course-detail-card {
+  border: 2px solid color-mix(in srgb, var(--rl-selection-line) 78%, var(--rl-line));
+  border-radius: 17px;
+  background: linear-gradient(145deg, #fffdf9, var(--rl-selection-bg));
+}
+
+html[data-design-chrome="storybook"] .practice-course-detail-card {
+  border-color: rgba(43, 182, 115, 0.28);
+  background: linear-gradient(145deg, #fffdf9, var(--rl-ok-bg));
+}
+
+html[data-design-chrome="storybook"] .practice-table {
+  border: 0;
+  border-radius: 0;
+  display: grid;
+  gap: 8px;
+  overflow: visible;
+}
+
+html[data-design-chrome="storybook"] .practice-table-row {
+  grid-template-columns: 36px minmax(120px, 1fr) minmax(80px, 0.54fr) 72px 52px;
+  gap: 6px;
+  border: 2px solid var(--rl-line);
+  border-radius: 15px;
+  background: #fffdfa;
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.03);
+}
+
+html[data-design-chrome="storybook"] .practice-table-row + .practice-table-row {
+  border-top: 2px solid var(--rl-line);
+}
+
+html[data-design-chrome="storybook"] .practice-table-head {
+  border: 0;
+  border-radius: 12px;
+  color: var(--rl-ink-soft);
+  background: #fff3e8;
+  box-shadow: none;
+}
+
+html[data-design-chrome="storybook"] .table-order-cell {
+  border-radius: 11px;
+  color: var(--rl-selection-deep);
+  background: var(--rl-selection-bg);
+}
+
+html[data-design-chrome="storybook"] .practice-table-actions {
+  min-width: 0;
+  justify-content: center;
+}
+
+html[data-design-chrome="storybook"] .practice-table-empty {
+  border: 2px dashed var(--rl-selection-line);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #fffdf9, var(--rl-selection-bg));
+}
+
+html[data-design-chrome="storybook"] .admin-metric-grid,
+html[data-design-chrome="storybook"] .admin-action-grid {
+  gap: 14px;
+}
+
+html[data-design-chrome="storybook"] .admin-metric-card {
+  min-height: 132px;
+  padding: 18px;
+}
+
+html[data-design-chrome="storybook"] .admin-metric-card:nth-child(4n + 1) {
+  background: linear-gradient(145deg, #fffdf9, var(--rl-selection-bg));
+}
+
+html[data-design-chrome="storybook"] .admin-metric-card:nth-child(4n + 2) {
+  background: linear-gradient(145deg, #fffdf9, var(--rl-info-bg));
+}
+
+html[data-design-chrome="storybook"] .admin-metric-card:nth-child(4n + 3) {
+  background: linear-gradient(145deg, #fffdf9, var(--rl-warn-bg));
+}
+
+html[data-design-chrome="storybook"] .admin-metric-card:nth-child(4n + 4),
+html[data-design-chrome="storybook"] .admin-metric-card.accent {
+  background: linear-gradient(145deg, #fffdf9, var(--rl-ok-bg));
+}
+
+html[data-design-chrome="storybook"] .admin-metric-card strong {
+  color: var(--rl-ink);
+  font-size: 1.85rem;
+  font-weight: 950;
+}
+
+html[data-design-chrome="storybook"] .admin-action-card {
+  border-radius: 20px;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+html[data-design-chrome="storybook"] .admin-action-card:hover:not(:disabled) {
+  border-color: var(--rl-selection-line);
+  background: var(--rl-selection-bg);
+  transform: translateY(-2px);
+}
+
+html[data-design-chrome="storybook"] .admin-action-card svg {
+  color: var(--rl-selection);
+}
+
+html[data-design-chrome="storybook"] .child-profile-row,
+html[data-design-chrome="storybook"] .analytics-status-list > span,
+html[data-design-chrome="storybook"] .analytics-progress-row {
+  border: 2px solid var(--rl-line);
+  border-radius: 17px;
+  background: #fffdfa;
+  box-shadow: 0 3px 0 rgba(26, 35, 50, 0.03);
+}
+
+html[data-design-chrome="storybook"] .child-profile-row.selected,
+html[data-design-chrome="storybook"] .child-profile-row:hover {
+  border-color: var(--rl-selection);
+  background: var(--rl-selection-bg);
+  box-shadow: 0 0 0 4px var(--rl-selection-ring);
+}
+
+html[data-design-chrome="storybook"] .child-profile-row .admin-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+}
+
+html[data-design-chrome="storybook"] .analytics-overview-card,
+html[data-design-chrome="storybook"] .analytics-score-card {
+  border: 2px solid var(--rl-line);
+  border-radius: 21px;
+  background: rgba(255, 252, 250, 0.96);
+  box-shadow: var(--kid-chunky);
+}
+
+html[data-design-chrome="storybook"] .analytics-donut {
+  background: conic-gradient(
+    var(--rl-selection) 0 var(--analytics-progress-angle),
+    var(--rl-selection-bg) var(--analytics-progress-angle) 360deg
+  );
+}
+
+html[data-design-chrome="storybook"] .analytics-donut > div {
+  border: 2px solid var(--rl-line);
+  background: #fffdfa;
+}
+
+html[data-design-chrome="storybook"] .settings-row {
+  min-height: 88px;
+  padding: 16px;
+}
+
+html[data-design-chrome="storybook"] .pdf-quality-report,
+html[data-design-chrome="storybook"] .pdf-structure-preview {
+  border-width: 2px;
+  border-radius: 20px;
+  box-shadow: 0 4px 0 rgba(26, 35, 50, 0.035);
+}
+
+html[data-design-chrome="storybook"] .sentence-editor-row textarea {
+  min-height: 68px;
+}
+
+html[data-design-chrome="storybook"] .admin-workspace,
+html[data-design-chrome="storybook"] .practice-course-list,
+html[data-design-chrome="storybook"] .tag-filter-options {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(233, 130, 43, 0.32) transparent;
+}
+
+html[data-design-chrome="storybook"] .admin-workspace::-webkit-scrollbar,
+html[data-design-chrome="storybook"] .practice-course-list::-webkit-scrollbar,
+html[data-design-chrome="storybook"] .tag-filter-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+html[data-design-chrome="storybook"] .admin-workspace::-webkit-scrollbar-thumb,
+html[data-design-chrome="storybook"] .practice-course-list::-webkit-scrollbar-thumb,
+html[data-design-chrome="storybook"] .tag-filter-options::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(233, 130, 43, 0.32);
+}
+
+html[data-design-chrome="storybook"] .admin-shell.layout-phone {
+  width: min(390px, 100%);
+  padding: 8px 6px 18px;
+}
+
+html[data-design-chrome="storybook"] .admin-shell.layout-tablet {
+  width: min(768px, 100%);
+  padding: 12px 10px 22px;
+}
+
+html[data-design-chrome="storybook"] .admin-shell.layout-phone .admin-app-frame,
+html[data-design-chrome="storybook"] .admin-shell.layout-tablet .admin-app-frame {
+  grid-template-columns: 1fr;
+  border-radius: 24px;
+}
+
+html[data-design-chrome="storybook"] .admin-shell.layout-phone .admin-sidebar,
+html[data-design-chrome="storybook"] .admin-shell.layout-tablet .admin-sidebar {
+  border-right: 0;
+  border-bottom: 3px solid var(--rl-line);
+  padding: 14px;
+}
+
+html[data-design-chrome="storybook"] .admin-shell.layout-phone .admin-workspace,
+html[data-design-chrome="storybook"] .admin-shell.layout-tablet .admin-workspace {
+  padding: 14px;
+}
+
+html[data-design-chrome="storybook"] .admin-shell.layout-phone .practice-books-pane,
+html[data-design-chrome="storybook"] .admin-shell.layout-tablet .practice-books-pane,
+html[data-design-chrome="storybook"] .admin-shell.layout-phone .practice-course-library-pane,
+html[data-design-chrome="storybook"] .admin-shell.layout-tablet .practice-course-library-pane {
+  border: 2px solid var(--rl-line);
+}
+
+html[data-design-chrome="storybook"] .settings-row--theme .ui-theme-switcher-group {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+@container (max-width: 1160px) {
+  html[data-design-chrome="storybook"] .practice-board-grid {
+    grid-template-columns: 232px minmax(0, 1fr);
+  }
+
+  html[data-design-chrome="storybook"] .practice-course-library-pane {
+    grid-column: 1 / -1;
+    order: initial;
+  }
+
+  html[data-design-chrome="storybook"] .practice-course-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: none;
+  }
+}
+
+@container (max-width: 760px) {
+  html[data-design-chrome="storybook"] .practice-board-grid {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-design-chrome="storybook"] .practice-course-library-pane {
+    grid-column: auto;
+    order: -1;
+  }
+
+  html[data-design-chrome="storybook"] .practice-course-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1180px), (hover: none) and (pointer: coarse) {
+  html[data-design-chrome="storybook"] .practice-board-grid {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-design-chrome="storybook"] .practice-books-pane,
+  html[data-design-chrome="storybook"] .practice-course-library-pane {
+    border: 2px solid var(--rl-line);
+  }
+
+  html[data-design-chrome="storybook"] .practice-course-library-pane {
+    order: -1;
+  }
+}
+
+@media (max-width: 1050px) {
+  html[data-design-chrome="storybook"] .admin-shell {
+    padding: 12px 10px 22px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-app-frame {
+    grid-template-columns: 1fr;
+    border-radius: 25px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-sidebar {
+    grid-template-rows: auto auto;
+    gap: 12px;
+    border-right: 0;
+    border-bottom: 3px solid var(--rl-line);
+    padding: 14px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  html[data-design-chrome="storybook"] .admin-nav-item {
+    justify-content: center;
+  }
+
+  html[data-design-chrome="storybook"] .admin-nav-item:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  html[data-design-chrome="storybook"] .admin-workspace {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  html[data-design-chrome="storybook"] .child-learning-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(120px, 36%) minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  html[data-design-chrome="storybook"] .child-left-rail {
+    border-right: 0;
+    border-bottom: 3px solid var(--rl-line);
+    max-height: 100%;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-bubble.ui-stage-card {
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 620px) {
+  html[data-design-chrome="storybook"] .admin-shell {
+    padding: 7px 5px 16px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-app-frame {
+    border-width: 2px;
+    border-radius: 20px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-sidebar {
+    border-bottom-width: 2px;
+    padding: 11px 9px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-brand {
+    padding: 0 3px 8px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-nav-item {
+    min-height: 44px;
+    border-radius: 14px;
+    padding: 0 8px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-shell.layout-phone .admin-nav-item span,
+  html[data-design-chrome="storybook"] .admin-nav-item span {
+    display: inline;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html[data-design-chrome="storybook"] .admin-child-page-link {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-workspace {
+    gap: 14px;
+    padding: 10px;
+    background-size: 22px 22px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-section-page,
+  html[data-design-chrome="storybook"] .practice-board-panel,
+  html[data-design-chrome="storybook"] .course-workspace-grid {
+    min-width: 0;
+  }
+
+  html[data-design-chrome="storybook"] .admin-panel,
+  html[data-design-chrome="storybook"] .admin-editor {
+    border-radius: 19px;
+    padding: 14px;
+  }
+
+  html[data-design-chrome="storybook"] .practice-board-panel {
+    padding: 14px;
+  }
+
+  html[data-design-chrome="storybook"] .practice-books-pane,
+  html[data-design-chrome="storybook"] .practice-content-pane,
+  html[data-design-chrome="storybook"] .practice-course-library-pane {
+    border-radius: 17px;
+    padding: 12px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-metric-card,
+  html[data-design-chrome="storybook"] .admin-action-card,
+  html[data-design-chrome="storybook"] .settings-row {
+    border-radius: 17px;
+  }
+
+  html[data-design-chrome="storybook"] .admin-metric-grid,
+  html[data-design-chrome="storybook"] .admin-action-grid,
+  html[data-design-chrome="storybook"] .child-management-tools,
+  html[data-design-chrome="storybook"] .analytics-grid,
+  html[data-design-chrome="storybook"] .settings-row {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-design-chrome="storybook"] .practice-board-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  html[data-design-chrome="storybook"] .practice-board-stats {
+    justify-content: flex-start;
+  }
+
+  html[data-design-chrome="storybook"] .practice-board-tools {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) max-content 40px;
+  }
+
+  html[data-design-chrome="storybook"] .practice-table-head {
+    display: none;
+  }
+
+  html[data-design-chrome="storybook"] .practice-table-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  html[data-design-chrome="storybook"] .table-progress-cell,
+  html[data-design-chrome="storybook"] .practice-status-chip,
+  html[data-design-chrome="storybook"] .practice-table-actions {
+    grid-column: 2;
+  }
+
+  html[data-design-chrome="storybook"] .child-profile-row {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  html[data-design-chrome="storybook"] .child-profile-row small,
+  html[data-design-chrome="storybook"] .child-profile-row em {
+    grid-column: 2;
+  }
+
+  html[data-design-chrome="storybook"] .child-shell {
+    padding: 10px 8px 22px;
+  }
+
+  html[data-design-chrome="storybook"] .child-player-topbar {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  html[data-design-chrome="storybook"] .child-profile-chip,
+  html[data-design-chrome="storybook"] .child-points-chip {
+    width: auto;
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 12px;
+  }
+
+  html[data-design-chrome="storybook"] .child-profile-chip {
+    grid-column: 1;
+    max-width: calc(100vw - 92px);
+    overflow: hidden;
+  }
+
+  html[data-design-chrome="storybook"] .child-points-chip {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  html[data-design-chrome="storybook"] .child-profile-chip strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html[data-design-chrome="storybook"] .child-profile-chip span {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+  }
+
+  html[data-design-chrome="storybook"] .child-top-tools {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  html[data-design-chrome="storybook"] .child-top-tools .ui-theme-switcher-group {
+    display: contents;
+  }
+
+  html[data-design-chrome="storybook"] .child-top-tools .theme-switcher,
+  html[data-design-chrome="storybook"] .child-top-tools .language-switcher,
+  html[data-design-chrome="storybook"] .child-top-tools .handback-button,
+  html[data-design-chrome="storybook"] .child-top-tools .ui-device-preview-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 0 10px;
+    overflow: hidden;
+  }
+
+  html[data-design-chrome="storybook"] .child-top-tools select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  html[data-design-chrome="storybook"] .child-learning-layout {
+    border-width: 2px;
+    border-radius: 24px;
+  }
+
+  html[data-design-chrome="storybook"] .child-left-rail {
+    max-height: 44vh;
+  }
+
+  html[data-design-chrome="storybook"] .sb-reading-pane.child-reading-stage {
+    padding: 12px 10px 16px;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-toolbar .ui-voice-pill,
+  html[data-design-chrome="storybook"] .sb-stage-toolbar .compact-voice-picker {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-toolbar select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-bubble.ui-stage-card {
+    min-height: 280px;
+    padding: 18px 12px 14px;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-bubble .ui-stage-card__dots,
+  html[data-design-chrome="storybook"] .sb-stage-bubble .ui-stage-card__badge {
+    display: none;
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-bubble .live-sentence-text,
+  html[data-design-chrome="storybook"] .sb-stage-bubble .sentence-text {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    font-size: clamp(1.65rem, 8vw, 2.05rem);
+  }
+
+  html[data-design-chrome="storybook"] .sb-stage-bubble .ui-record-orb,
+  html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button {
+    width: 88px;
+    height: 88px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button::before,
+  html[data-design-chrome="storybook"] .sb-stage-bubble .record-orb-button::after,
+  html[data-design-chrome="storybook"] .record-orb-button.recording,
+  html[data-design-chrome="storybook"] .record-orb-button.recording::before,
+  html[data-design-chrome="storybook"] .record-orb-button.recording::after {
+    animation: none;
+  }
+}
+
+/* Component-scoped narrow layout: also applies inside device previews and split panes. */
+@container reading-pane (max-width: 520px) {
+  html[data-design-chrome="storybook"] .sb-stage-toolbar .ui-voice-pill,
+  html[data-design-chrome="storybook"] .sb-stage-toolbar .compact-voice-picker {
+    width: auto;
+    max-width: 100%;
+    flex: none;
+    align-self: stretch;
+  }
+}
+
+html[data-design-chrome="storybook"] .provider-ab-panel {
+  margin-top: 8px;
+  border: 1px solid color-mix(in srgb, var(--sb-ink, #172033) 14%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--sb-paper, #fffaf4) 92%, white);
+  color: var(--sb-ink, #172033);
+  font-size: 0.8rem;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-panel summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-panel summary span {
+  color: #7a6859;
+  font-weight: 600;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid section {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #f3c89e;
+  border-radius: 12px;
+  background: #fff;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid section.error {
+  border-color: #efb3a9;
+  background: #fff5f2;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid section.rejected {
+  border-color: #efc66e;
+  background: #fffaf0;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid header,
+html[data-design-chrome="storybook"] .provider-ab-grid dl,
+html[data-design-chrome="storybook"] .provider-ab-grid dl div {
+  display: flex;
+  align-items: center;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid header {
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid header em {
+  color: #e56f3f;
+  font-size: 0.65rem;
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid dl {
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin: 0;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid dl div {
+  gap: 4px;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid dt {
+  color: #857161;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #a33f35;
+}
+
+html[data-design-chrome="storybook"] .provider-ab-grid .provider-ab-rejected {
+  margin-bottom: 7px;
+  color: #8a5c18;
+}
+
+@media (max-width: 620px) {
+  html[data-design-chrome="storybook"] .provider-ab-grid {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-design-chrome="storybook"] .provider-ab-panel summary span {
+    display: none;
+  }
+}
