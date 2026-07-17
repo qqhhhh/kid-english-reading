@@ -15,6 +15,7 @@ import {
   syncOfficialCourseToServer,
   updateOfficialCourseStatus
 } from "../../lib/api";
+import { controlPaddleOcr, fetchPaddleOcrStatus, type PaddleOcrServiceStatus } from "../../lib/paddleOcrApi";
 import type { CourseSyncDraft, CourseSyncStatus, HunyuanOcrServiceStatus, ImportedLessonChapterPreview, PdfImportPreview, OfficialCourseResource, PlatformAdminAuditLog } from "../../lib/types";
 import { describePdfImportProgress } from "../../lib/pdfImportProgress";
 import { CourseContentEditor } from "../course/CourseContentEditor";
@@ -109,6 +110,8 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
   const [error, setError] = useState("");
   const [hunyuanStatus, setHunyuanStatus] = useState<HunyuanOcrServiceStatus | null>(null);
   const [hunyuanBusy, setHunyuanBusy] = useState(false);
+  const [paddleStatus, setPaddleStatus] = useState<PaddleOcrServiceStatus | null>(null);
+  const [paddleBusy, setPaddleBusy] = useState(false);
   const [auditLogs, setAuditLogs] = useState<PlatformAdminAuditLog[]>([]);
   const [auditLogsBusy, setAuditLogsBusy] = useState(false);
   const [courseSyncStatus, setCourseSyncStatus] = useState<CourseSyncStatus | null>(null);
@@ -135,6 +138,10 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
     setHunyuanStatus(await fetchHunyuanOcrStatus());
   }
 
+  async function loadPaddleStatus() {
+    setPaddleStatus(await fetchPaddleOcrStatus());
+  }
+
   async function loadAuditLogs() {
     setAuditLogsBusy(true);
     try {
@@ -150,7 +157,10 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
       setAuthorized(allowed);
       if (allowed) {
         void loadData().catch((loadError) => setError(loadError instanceof Error ? loadError.message : "加载失败"));
-        if (isLocalStudio) void loadHunyuanStatus().catch((loadError) => setError(loadError instanceof Error ? loadError.message : "HunyuanOCR 状态加载失败"));
+        if (isLocalStudio) {
+          void loadHunyuanStatus().catch((loadError) => setError(loadError instanceof Error ? loadError.message : "HunyuanOCR 状态加载失败"));
+          void loadPaddleStatus().catch((loadError) => setError(loadError instanceof Error ? loadError.message : "PaddleOCR 状态加载失败"));
+        }
         void loadAuditLogs().catch(() => undefined);
       }
     });
@@ -159,7 +169,10 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
   useEffect(() => {
     if (!authorized) return undefined;
     const timer = window.setInterval(() => {
-      if (isLocalStudio) void loadHunyuanStatus().catch(() => undefined);
+      if (isLocalStudio) {
+        void loadHunyuanStatus().catch(() => undefined);
+        void loadPaddleStatus().catch(() => undefined);
+      }
       void loadAuditLogs().catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
@@ -406,6 +419,23 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
     }
   }
 
+  async function changePaddleState(action: "start" | "stop") {
+    setPaddleBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const status = await controlPaddleOcr(action);
+      setPaddleStatus(status);
+      setMessage(action === "start" ? "PaddleOCR 已启动，后续 PDF 导入会自动加入本地高精度复核。" : "PaddleOCR 已停止，PDF 导入会自动跳过该通道。");
+    } catch (controlError) {
+      setError(controlError instanceof Error ? controlError.message : "PaddleOCR 操作失败");
+      await loadPaddleStatus().catch(() => undefined);
+    } finally {
+      setPaddleBusy(false);
+      void loadAuditLogs().catch(() => undefined);
+    }
+  }
+
   if (authorized === null) return <main className="platform-admin-page" aria-label="正在验证管理员权限" />;
   if (!authorized) {
     return (
@@ -418,7 +448,7 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
   return (
     <main className="platform-admin-page">
       <header className="platform-admin-header">
-        <div>{isLocalStudio ? <Cpu size={28} /> : <ShieldCheck size={28} />}<span><small>{isLocalStudio ? "仅限本机管理员" : "自托管服务器"}</small><strong>{isLocalStudio ? "课程制作工作台" : "平台课程管理"}</strong></span></div>
+        <div>{isLocalStudio ? <Cpu size={28} /> : <ShieldCheck size={28} />}<span><small>{isLocalStudio ? "仅限本机管理员" : "qiangzihang.com"}</small><strong>{isLocalStudio ? "课程制作工作台" : "平台课程管理"}</strong></span></div>
         <nav>
           <a href={isLocalStudio ? "/admin" : "/parent"}><ArrowLeft size={16} />{isLocalStudio ? "平台管理" : "家长端"}</a>
           {!isLocalStudio && ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname) ? <a href="/local-course-studio"><Cpu size={16} />本机课程制作</a> : null}
@@ -433,7 +463,7 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
           <span><CloudUpload size={20} /></span>
           <div>
             <small>{isLocalStudio ? "本机审核 · HTTPS 交付" : "服务器接收 · 管理员确认"}</small>
-            <h2>{isLocalStudio ? "自托管服务器发布通道" : "课程服务器草稿箱"}</h2>
+            <h2>{isLocalStudio ? "qiangzihang.com 发布通道" : "课程服务器草稿箱"}</h2>
             <p>{courseSyncStatus?.message || "正在检查课程同步配置…"}</p>
           </div>
           {courseSyncStatus?.targetEnabled && <b>{courseSyncStatus.secure ? "HTTPS + HMAC" : "本地调试 + HMAC"} · Key {courseSyncStatus.activeKeyId} · {courseSyncStatus.targetUrl}</b>}
@@ -494,7 +524,7 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
           <label>版权或来源<input value={metadata.sourceLabel} onChange={(event) => setMetadata({ ...metadata, sourceLabel: event.target.value })} maxLength={100} required /></label>
           {error && <p className="platform-publish-inline-error" role="alert">{error}</p>}
           <div className="platform-publish-actions">
-            <Button type="submit" variant="primary" disabled={busy || uploading || courseSyncBusy || !preview?.importId || !courseSyncStatus?.targetEnabled}><CloudUpload size={18} />{courseSyncBusy ? "上传中…" : "上传到服务器草稿箱"}</Button>
+            <Button type="submit" variant="primary" disabled={busy || uploading || courseSyncBusy || !preview?.importId || !courseSyncStatus?.targetEnabled}><CloudUpload size={18} />{courseSyncBusy ? "上传中…" : "上传到 qiangzihang.com 草稿箱"}</Button>
           </div>
         </form> : null}
 
@@ -518,6 +548,19 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
               <button className="is-stop" disabled={hunyuanBusy || !hunyuanStatus.controllable} onClick={() => void changeHunyuanState("stop")} type="button"><Square size={12} />{hunyuanBusy ? "停止中…" : "停止"}</button>
             ) : (
               <button className="is-start" disabled={hunyuanBusy || !hunyuanStatus?.controllable} onClick={() => void changeHunyuanState("start")} type="button"><Play size={13} />{hunyuanBusy ? "启动中…" : "启动"}</button>
+            )}
+          </div> : null}
+          {isLocalStudio ? <div className={`platform-hunyuan-compact status-${paddleStatus?.state || "loading"}`}>
+            <Cpu size={17} />
+            <span>
+              <strong>PaddleOCR <b>{paddleStatus?.online ? "运行中" : paddleStatus?.installed ? "已停止" : paddleStatus ? "未安装" : "检测中"}</b></strong>
+              <small>{paddleStatus ? `${paddleStatus.model} · ${paddleStatus.device} · ${paddleStatus.endpoint}` : "正在读取本机服务状态…"}</small>
+            </span>
+            <button aria-label="刷新 PaddleOCR 状态" disabled={paddleBusy} onClick={() => void loadPaddleStatus()} type="button"><RefreshCw size={14} /></button>
+            {paddleStatus?.online ? (
+              <button className="is-stop" disabled={paddleBusy || !paddleStatus.controllable} onClick={() => void changePaddleState("stop")} type="button"><Square size={12} />{paddleBusy ? "停止中…" : "停止"}</button>
+            ) : (
+              <button className="is-start" disabled={paddleBusy || !paddleStatus?.controllable} onClick={() => void changePaddleState("start")} type="button"><Play size={13} />{paddleBusy ? "启动中…" : "启动"}</button>
             )}
           </div> : null}
           <button aria-label="刷新控制台操作日志" disabled={auditLogsBusy} onClick={() => void loadAuditLogs()} type="button"><RefreshCw className={auditLogsBusy ? "is-spinning" : ""} size={15} />刷新日志</button>

@@ -705,6 +705,46 @@ export type RecordingQuality = {
   };
 };
 
+export type ClientDeviceDiagnostics = {
+  userAgent?: string;
+  platform?: string;
+  language?: string;
+  viewport?: { width?: number; height?: number };
+  screen?: { width?: number; height?: number };
+  devicePixelRatio?: number;
+  maxTouchPoints?: number;
+  online?: boolean;
+  connection?: {
+    effectiveType?: string;
+    downlink?: number;
+    rtt?: number;
+    saveData?: boolean;
+  };
+};
+
+export type LiveSpeechComparison = {
+  runId: string;
+  provider: "tencent";
+  itemType: "word" | "sentence" | "paragraph";
+  evalMode: 1 | 2 | 7;
+  audioSource: "raw-stream";
+  suggestedScore: number;
+  pronAccuracy: number;
+  pronFluency: number;
+  pronCompletion: number;
+  finalLatencyMs: number;
+  interimCount: number;
+  audioBytes: number;
+  audioChunks: number;
+  finalReceivedAt: string;
+  words: Array<{
+    word: string;
+    referenceWord: string;
+    accuracy: number;
+    matchTag: number;
+  }>;
+};
+
 export type Attempt = {
   id: string;
   childId?: string;
@@ -712,6 +752,8 @@ export type Attempt = {
   referenceText: string;
   createdAt: string;
   speechProvider?: "mock" | "tencent" | "azure" | "xfyun" | string;
+  assessmentItemType?: "word" | "sentence" | "paragraph";
+  assessmentSource?: "live-stream" | "raw-wav-fallback" | "batch";
   audioBytes: number;
   audioAvailable?: boolean;
   rawAudioAvailable?: boolean;
@@ -723,6 +765,11 @@ export type Attempt = {
   lowAccuracyIssues?: number;
   minWordAccuracy?: number | null;
   recordingQuality?: RecordingQuality;
+  clientDevice?: ClientDeviceDiagnostics;
+  diagnosticStatus?: "scored" | "rejected";
+  rejectionStage?: "client" | "server";
+  rejectionCode?: string;
+  rejectedReason?: string;
   candidateSelection?: {
     strategy: "latest-complete-contiguous" | "full-session" | string;
     selectedId: string;
@@ -748,6 +795,18 @@ export type Attempt = {
     primary: SpeechProviderComparisonResult;
     shadow: SpeechProviderComparisonResult;
   };
+  liveSpeechComparison?: LiveSpeechComparison;
+  processingTimings?: {
+    enhancementMs?: number;
+    primaryAssessmentMs?: number;
+    rawComparisonMs?: number;
+    decisionReadyMs?: number;
+    clientRoundTripMs?: number;
+    shadowState?: "disabled" | "queued" | "completed" | "dropped" | string;
+    shadowProvider?: string;
+    shadowAssessmentMs?: number;
+    shadowCompletedAt?: string;
+  };
   speechEnhancement?: {
     provider: string;
     model?: string;
@@ -764,6 +823,48 @@ export type Attempt = {
     rawComparison?: Record<string, unknown>;
     noiseGate?: Record<string, unknown>;
   };
+};
+
+export type CalibrationLabel = "correct" | "missed" | "misread" | "silent" | "noise" | "other";
+
+export type AttemptCalibrationReview = {
+  label: CalibrationLabel;
+  note: string;
+  reviewedAt: string;
+  reviewedBy: { id: string; username: string };
+};
+
+export type CalibrationProviderSummary = {
+  evaluated: number;
+  mismatches: number;
+  falseAccepts: number;
+  falseRejects: number;
+  unavailable: number;
+  errorRate: number | null;
+};
+
+export type AttemptCalibrationSummary = {
+  totalSamples: number;
+  reviewed: number;
+  unreviewed: number;
+  labels: Record<CalibrationLabel, number>;
+  providers: Record<"tencent" | "xfyun", CalibrationProviderSummary>;
+};
+
+export type AttemptDiagnostic = Attempt & {
+  childName: string;
+  sourceType: "lesson" | "storybook";
+  contentId: string;
+  contentTitle: string;
+  storybookPageId?: string;
+  calibration?: AttemptCalibrationReview;
+};
+
+export type AttemptDiagnosticResponse = {
+  attempts: AttemptDiagnostic[];
+  hasMore: boolean;
+  limit: number;
+  calibrationSummary: AttemptCalibrationSummary;
 };
 
 export type AutomaticPracticeSession = {

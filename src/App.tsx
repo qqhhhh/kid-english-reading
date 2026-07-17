@@ -27,17 +27,21 @@ import {
   getAttemptAudioUrl,
   getReferenceAudioUrl,
   submitAttempt,
+  submitRejectedAttemptDiagnostic,
   updatePracticeBookItem
 } from "./lib/api";
 import { ChildTopBar } from "./components/child/ChildTopBar";
 import { AuthenticatedRoute, LoginPage } from "./components/parent/ParentAccessGate";
+import { PracticeIssueNotice } from "./components/practice/PracticeIssueNotice";
 import { FilingReviewDemoPage } from "./components/public/FilingReviewDemoPage";
 import { useDesignChrome } from "./components/design/DesignThemeContext";
-import { Metric, ProgressBar, RecordOrb, StageCard, StatusBanner, WordChip } from "./components/ui";
+import { Metric, ProgressBar, RecordOrb, StageCard, StatusBanner, VoicePicker, WordChip } from "./components/ui";
 import { getDeviceChildId, getDevicePracticeItemId, getUrlPracticeContext, storeDevicePracticeContext } from "./lib/deviceSession";
 import { formatMessage, getInitialLocale, messages, storeLocale, type Locale } from "./lib/i18n";
 import { selectHistoricalAttempt } from "./lib/historicalAttempt";
+import { prepareLiveSpeechSession, type LiveSpeechSession } from "./lib/liveSpeech";
 import { preflightMicrophoneAccess, type MicrophoneAccessState } from "./lib/microphonePermission";
+import { getPracticeIssue, type PracticeIssue } from "./lib/practiceErrors";
 import { releaseScreenWakeLock, requestScreenWakeLock, type ScreenWakeLockHandle } from "./lib/screenWakeLock";
 import {
   getAssessmentPhonetic,
@@ -53,6 +57,9 @@ import {
 import type { Attempt, AutomaticPracticeSession, Chapter, ChildProfile, Lesson, LessonProgress, LessonSection, Sentence, TtsSubtitle, TtsVoice } from "./lib/types";
 import { RecordingQualityError, WavRecorder, type SpeechSegmentSummary } from "./lib/wavRecorder";
 import { decideAutomaticRecordingFailure, decideAutomaticScoreOutcome } from "../shared/automaticPractice.js";
+import { getLiveSpeechTestFinalResult } from "../shared/liveSpeechPilot.js";
+import { getAutomaticRecordingStopDelayMs } from "../shared/recordingStopPolicy.js";
+import { prepareDuringPlayback, prepareSequentialAudio } from "../shared/sequentialAudio.js";
 
 const LazyDevicePreviewStudio = lazy(() =>
   import("./components/design/DevicePreviewStudio").then(({ DevicePreviewStudio }) => ({ default: DevicePreviewStudio }))
@@ -81,16 +88,13 @@ function RouteLoadingScreen() {
 }
 
 type PracticeTaskDisplayStatus = "pending" | "in_progress" | "completed";
-type GuidedPracticePhase = "idle" | "preparing" | "listening" | "audio-blocked" | "waiting" | "speaking" | "scoring";
+type GuidedPracticePhase = "idle" | "listening" | "audio-blocked" | "waiting" | "speaking" | "scoring";
 type ReferencePlaybackFailure = "blocked" | "failed" | null;
 type AutomaticPracticePendingAction =
   | { kind: "retry"; sentenceId: string }
   | { kind: "next"; sentenceIndex: number; sentenceId: string }
   | null;
 type AutomaticPracticeNotice = { message: string; tone: "info" | "ok" | "warn" | "bad" } | null;
-
-const recordingCountdownStepMs = 900;
-const recordingLeadInMs = 300;
 
 function getPracticeTaskDisplayStatus(itemStatus: string, progressItem: LessonProgress | undefined, progressPercent: number): PracticeTaskDisplayStatus {
   if (itemStatus === "completed" || progressPercent >= 100) return "completed";
@@ -223,6 +227,10 @@ function getSentenceSection(lesson: Lesson, sentenceId: string) {
   return null;
 }
 
+function isWordPracticeItem(lesson: Lesson, sentence: Sentence) {
+  return sentence.itemType === "word" || getSentenceSection(lesson, sentence.id)?.section.type === "vocabulary";
+}
+
 function getPassedSentenceCount(sentences: Sentence[], progress: LessonProgress | undefined) {
   const sentenceIds = new Set(sentences.map((sentence) => sentence.id));
   return progress?.sentences.filter((sentence) => (sentence.completed ?? sentence.passed) && sentenceIds.has(sentence.sentenceId)).length || 0;
@@ -284,6 +292,7 @@ function AuthenticatedApplication() {
   const pageParams = new URLSearchParams(window.location.search);
   const isDevicePreview = pageParams.get("devicePreview") === "1";
   const isFilingReviewSandbox = pageParams.get("review") === "1";
+  const isLiveSpeechPreferred = !isDevicePreview && !isFilingReviewSandbox;
   const [locale, setLocale] = useState<Locale>(() => getInitialLocale());
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [activeChild, setActiveChild] = useState<ChildProfile | null>(null);
@@ -302,7 +311,6 @@ function AuthenticatedApplication() {
   const [isRecording, setIsRecording] = useState(false);
   const [isScoring, setIsScoring] = useState(false);
   const [guidedPracticePhase, setGuidedPracticePhase] = useState<GuidedPracticePhase>("idle");
-  const [recordingCountdown, setRecordingCountdown] = useState(0);
   const [isAutomaticPracticeActive, setIsAutomaticPracticeActive] = useState(false);
   const [automaticNoSpeechCount, setAutomaticNoSpeechCount] = useState(0);
   const [automaticFailedAttemptCount, setAutomaticFailedAttemptCount] = useState(0);
@@ -318,12 +326,17 @@ function AuthenticatedApplication() {
   const [referenceSubtitles, setReferenceSubtitles] = useState<TtsSubtitle[]>([]);
   const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | PracticeIssue>("");
   const [microphoneAccessState, setMicrophoneAccessState] = useState<MicrophoneAccessState>(
     isDevicePreview ? "skipped" : "checking"
   );
   const recorderRef = useRef<WavRecorder | null>(null);
-  const recordingLeadInRef = useRef(false);
+  const liveSpeechTestSessionRef = useRef<LiveSpeechSession | null>(null);
+  const liveSpeechTestRunIdRef = useRef("");
+  const liveSpeechTestCaptureActiveRef = useRef(false);
+  const liveSpeechTestEndRequestedAtRef = useRef(0);
+  const liveSpeechTestPendingAudioRef = useRef<Array<{ samples: Float32Array; inputSampleRate: number }>>([]);
+  const liveSpeechTestPendingAudioMsRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const attemptAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioFrameRef = useRef<number | null>(null);
@@ -335,6 +348,7 @@ function AuthenticatedApplication() {
   const practiceNavigatorRef = useRef<HTMLElement | null>(null);
   const referencePlaybackResolverRef = useRef<((completed: boolean) => void) | null>(null);
   const referencePlaybackFailureRef = useRef<ReferencePlaybackFailure>(null);
+  const referencePlaybackRunRef = useRef(0);
   const stopRecordingInFlightRef = useRef(false);
   const automaticPracticeActiveRef = useRef(false);
   const automaticPracticeSessionRef = useRef(0);
@@ -399,6 +413,13 @@ function AuthenticatedApplication() {
       stopAttemptAudio();
       void recorderRef.current?.cancel();
       recorderRef.current = null;
+      liveSpeechTestSessionRef.current?.cancel();
+      liveSpeechTestSessionRef.current = null;
+      liveSpeechTestRunIdRef.current = "";
+      liveSpeechTestCaptureActiveRef.current = false;
+      liveSpeechTestEndRequestedAtRef.current = 0;
+      liveSpeechTestPendingAudioRef.current = [];
+      liveSpeechTestPendingAudioMsRef.current = 0;
       screenWakeLockRequestRef.current += 1;
       void releaseScreenWakeLock(screenWakeLockRef.current);
       screenWakeLockRef.current = null;
@@ -489,7 +510,10 @@ function AuthenticatedApplication() {
     : undefined;
   const progress = lesson ? Math.round((passedCount / lesson.sentences.length) * 100) : 0;
   const microphoneReady = microphoneAccessState === "granted" || microphoneAccessState === "skipped";
-  const currentItemCompleted = Boolean(attempt && (attempt.passed || sentence?.required === false));
+  const currentItemCompleted = Boolean(
+    attempt && (attempt.passed || (sentence?.required === false && attempt.result.SuggestedScore > 0))
+  );
+  const currentSelectionCompleted = Boolean(sentenceProgress?.completed);
   const canGoNext = Boolean(currentItemCompleted && sentenceIndex < (lesson?.sentences.length ?? 0) - 1);
   const isLessonComplete = Boolean(lesson && passedCount >= lesson.sentences.length);
   const problemWords = useMemo(() => (attempt ? getProblemWords(attempt.result) : []), [attempt]);
@@ -499,10 +523,6 @@ function AuthenticatedApplication() {
   const guidedPracticeLabel =
     microphoneAccessState === "checking"
       ? t.preparingMic
-      : guidedPracticePhase === "preparing"
-      ? recordingCountdown > 0
-        ? formatMessage(t.automaticPracticeCountdown, { count: recordingCountdown })
-        : t.preparingMic
       : guidedPracticePhase === "listening"
         ? t.playing
         : guidedPracticePhase === "waiting"
@@ -513,15 +533,13 @@ function AuthenticatedApplication() {
               ? t.checking
               : isAutomaticPracticeActive
                 ? t.automaticPracticePreparing
-                : t.start;
+                : currentSelectionCompleted
+                  ? t.practiceDone
+                  : t.start;
   const automaticPracticeStatusText =
     guidedPracticePhase === "listening"
       ? t.automaticPracticeListening
-      : guidedPracticePhase === "preparing"
-        ? recordingCountdown > 0
-          ? formatMessage(t.automaticPracticeCountdown, { count: recordingCountdown })
-          : t.preparingMic
-        : guidedPracticePhase === "waiting" || guidedPracticePhase === "speaking"
+      : guidedPracticePhase === "waiting" || guidedPracticePhase === "speaking"
           ? t.automaticPracticeReading
           : guidedPracticePhase === "scoring"
             ? t.automaticPracticeScoring
@@ -529,7 +547,9 @@ function AuthenticatedApplication() {
               ? automaticNoSpeechCount > 0
                 ? formatMessage(t.automaticPracticeNoSpeechRetry, { count: automaticNoSpeechCount })
                 : t.automaticPracticeRetrying
-              : attemptSource === "current" && attempt && (attempt.passed || sentence?.required === false)
+              : attemptSource === "current" && attempt && (
+                  attempt.passed || (sentence?.required === false && attempt.result.SuggestedScore > 0)
+                )
                 ? sentenceIndex >= (lesson?.sentences.length ?? 1) - 1
                   ? t.automaticPracticeCompleted
                   : t.automaticPracticePassedNext
@@ -542,6 +562,10 @@ function AuthenticatedApplication() {
       automaticPracticePendingAction.sentenceId === sentence.id &&
       (automaticPracticePendingAction.kind === "retry" || automaticPracticePendingAction.sentenceIndex === sentenceIndex);
     if (!actionMatches) return;
+    if (currentSelectionCompleted) {
+      deactivateAutomaticPractice(t.automaticPracticeAlreadyCompleted, "info", "completed");
+      return;
+    }
 
     const sessionId = automaticPracticeSessionRef.current;
     const delayMs = automaticPracticePendingAction.kind === "retry" ? 1700 : 650;
@@ -558,7 +582,14 @@ function AuthenticatedApplication() {
         automaticPracticeTimeoutRef.current = null;
       }
     };
-  }, [automaticPracticePendingAction, guidedPracticePhase, isAutomaticPracticeActive, sentence?.id, sentenceIndex]);
+  }, [
+    automaticPracticePendingAction,
+    currentSelectionCompleted,
+    guidedPracticePhase,
+    isAutomaticPracticeActive,
+    sentence?.id,
+    sentenceIndex
+  ]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -757,17 +788,51 @@ function AuthenticatedApplication() {
 
   function markMicrophoneFailure(error: unknown) {
     const name = error instanceof Error ? error.name : "";
-    setMicrophoneAccessState(name === "NotAllowedError" || name === "PermissionDeniedError" ? "denied" : "unavailable");
+    setMicrophoneAccessState(
+      name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError" ? "denied" : "unavailable"
+    );
+  }
+
+  function cancelLiveSpeechTestSession() {
+    liveSpeechTestSessionRef.current?.cancel();
+    liveSpeechTestSessionRef.current = null;
+    liveSpeechTestRunIdRef.current = "";
+    liveSpeechTestCaptureActiveRef.current = false;
+    liveSpeechTestEndRequestedAtRef.current = 0;
+    liveSpeechTestPendingAudioRef.current = [];
+    liveSpeechTestPendingAudioMsRef.current = 0;
+  }
+
+  function startLiveSpeechTestCapture() {
+    if (!isLiveSpeechPreferred || !liveSpeechTestRunIdRef.current) return;
+    liveSpeechTestCaptureActiveRef.current = true;
+    liveSpeechTestEndRequestedAtRef.current = 0;
+    const session = liveSpeechTestSessionRef.current;
+    if (!session) return;
+    session.open();
+  }
+
+  function finishLiveSpeechTestCapture() {
+    if (!isLiveSpeechPreferred || !liveSpeechTestCaptureActiveRef.current) return;
+    liveSpeechTestCaptureActiveRef.current = false;
+    const runId = liveSpeechTestRunIdRef.current;
+    const session = liveSpeechTestSessionRef.current;
+    liveSpeechTestEndRequestedAtRef.current = performance.now();
+    if (!runId || !session) {
+      liveSpeechTestPendingAudioRef.current = [];
+      liveSpeechTestPendingAudioMsRef.current = 0;
+      return;
+    }
+    session.finish();
   }
 
   async function cancelGuidedPractice() {
     clearRecordingTimers();
     stopReferenceAudio();
-    recordingLeadInRef.current = false;
     const recorder = recorderRef.current;
     recorderRef.current = null;
+    cancelLiveSpeechTestSession();
     setIsRecording(false);
-    setRecordingCountdown(0);
     setGuidedPracticePhase("idle");
     if (recorder && !stopRecordingInFlightRef.current) {
       await recorder.cancel();
@@ -858,7 +923,13 @@ function AuthenticatedApplication() {
   }
 
   function startAutomaticPractice() {
-    if (!sentence || !microphoneReady || guidedPracticePhase !== "idle" || stopRecordingInFlightRef.current) return;
+    if (
+      !sentence ||
+      currentSelectionCompleted ||
+      !microphoneReady ||
+      guidedPracticePhase !== "idle" ||
+      stopRecordingInFlightRef.current
+    ) return;
     automaticPracticeSessionRef.current += 1;
     automaticPracticeActiveRef.current = true;
     automaticNoSpeechCountRef.current = 0;
@@ -887,20 +958,20 @@ function AuthenticatedApplication() {
   }
 
   function scheduleAutomaticStop(segments: SpeechSegmentSummary[]) {
-    if (!sentence || stopRecordingInFlightRef.current) return;
+    if (!lesson || !sentence || stopRecordingInFlightRef.current) return;
     if (recordingAutoStopTimeoutRef.current !== null) {
       window.clearTimeout(recordingAutoStopTimeoutRef.current);
     }
-    const totalVoiceDurationMs = segments.reduce((sum, segment) => sum + segment.voiceDurationMs, 0);
     const expectedVoiceDurationMs = getExpectedVoiceDurationMs(sentence);
-    const durationRatio = totalVoiceDurationMs / expectedVoiceDurationMs;
-    const hasEnoughSpeech = durationRatio >= 0.72;
-    const stopDelayMs =
-      segments.length === 1 ? (durationRatio >= 0.72 && durationRatio <= 1.8 ? 1100 : 2400) : hasEnoughSpeech ? 650 : 1800;
+    const stopDelayMs = getAutomaticRecordingStopDelayMs({
+      isWordItem: isWordPracticeItem(lesson, sentence),
+      segments,
+      expectedVoiceDurationMs
+    });
     recordingAutoStopTimeoutRef.current = window.setTimeout(
       () => {
         recordingAutoStopTimeoutRef.current = null;
-        void stopRecording();
+        void stopRecording({ recorderTailMs: isWordPracticeItem(lesson, sentence) ? 0 : undefined });
       },
       stopDelayMs
     );
@@ -914,10 +985,30 @@ function AuthenticatedApplication() {
     stopAttemptAudio();
     stopReferenceAudio();
     clearRecordingTimers();
-    recordingLeadInRef.current = false;
+    cancelLiveSpeechTestSession();
     setGuidedPracticePhase("listening");
 
+    const wordItem = Boolean(lesson && isWordPracticeItem(lesson, sentence));
+    const liveSpeechTestRunId = isLiveSpeechPreferred && activeChild?.id && lesson
+      ? `live-${crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
+      : "";
+    if (liveSpeechTestRunId) {
+      liveSpeechTestRunIdRef.current = liveSpeechTestRunId;
+    }
     const recorder = new WavRecorder({
+      vadRedemptionMs: wordItem ? 650 : 900,
+      onAudioChunk: (samples, inputSampleRate) => {
+        const session = liveSpeechTestSessionRef.current;
+        if (session) {
+          session.sendAudio(samples, inputSampleRate);
+          return;
+        }
+        if (!liveSpeechTestCaptureActiveRef.current || !liveSpeechTestRunIdRef.current) return;
+        const durationMs = samples.length / inputSampleRate * 1000;
+        if (liveSpeechTestPendingAudioMsRef.current + durationMs > 2000) return;
+        liveSpeechTestPendingAudioRef.current.push({ samples: new Float32Array(samples), inputSampleRate });
+        liveSpeechTestPendingAudioMsRef.current += durationMs;
+      },
       onSpeechStart: () => {
         if (recordingAutoStopTimeoutRef.current !== null) {
           window.clearTimeout(recordingAutoStopTimeoutRef.current);
@@ -927,24 +1018,76 @@ function AuthenticatedApplication() {
           window.clearTimeout(recordingNoSpeechTimeoutRef.current);
           recordingNoSpeechTimeoutRef.current = null;
         }
-        if (!recordingLeadInRef.current) setGuidedPracticePhase("speaking");
+        setGuidedPracticePhase("speaking");
       },
       onSpeechEnd: (_segment, segments) => {
-        if (recordingLeadInRef.current) return;
         setGuidedPracticePhase("waiting");
         scheduleAutomaticStop(segments);
       },
       onVADMisfire: () => {
-        if (!recordingLeadInRef.current) setGuidedPracticePhase("waiting");
+        setGuidedPracticePhase("waiting");
       }
     });
     recorderRef.current = recorder;
+    if (liveSpeechTestRunId && activeChild?.id && lesson) {
+      void prepareLiveSpeechSession({
+        runId: liveSpeechTestRunId,
+        childId: activeChild.id,
+        sentenceId: sentence.id,
+        referenceText: sentence.text,
+        itemType: wordItem ? "word" : sentence.itemType === "reading" ? "paragraph" : "sentence",
+        onProgress: (progress) => {
+          if (liveSpeechTestRunIdRef.current !== liveSpeechTestRunId) return;
+          const receivedAtMs = performance.now();
+          const finalResult = getLiveSpeechTestFinalResult({
+            final: progress.final,
+            suggestedScore: progress.suggestedScore,
+            completion: progress.completion,
+            wordCount: progress.words.length,
+            endRequestedAtMs: liveSpeechTestEndRequestedAtRef.current,
+            receivedAtMs
+          });
+          if (!finalResult) return;
+          liveSpeechTestSessionRef.current = null;
+        },
+        onUnavailable: () => {
+          if (liveSpeechTestRunIdRef.current !== liveSpeechTestRunId) return;
+          liveSpeechTestSessionRef.current = null;
+        }
+      }).then((session) => {
+        if (!session) {
+          if (liveSpeechTestRunIdRef.current === liveSpeechTestRunId) {
+            liveSpeechTestRunIdRef.current = "";
+          }
+          return;
+        }
+        if (
+          liveSpeechTestRunIdRef.current !== liveSpeechTestRunId ||
+          liveSpeechTestEndRequestedAtRef.current > 0
+        ) {
+          session.cancel();
+          return;
+        }
+        liveSpeechTestSessionRef.current = session;
+        if (liveSpeechTestCaptureActiveRef.current) {
+          session.open();
+          for (const audio of liveSpeechTestPendingAudioRef.current) {
+            session.sendAudio(audio.samples, audio.inputSampleRate);
+          }
+          liveSpeechTestPendingAudioRef.current = [];
+          liveSpeechTestPendingAudioMsRef.current = 0;
+        }
+      });
+    }
 
     try {
-      // Start playback before the first await so Safari keeps the button tap's
-      // user activation. Preparing the microphone first makes iOS treat the
-      // later audio.play() call as blocked autoplay.
-      const referenceCompleted = await playReferenceAudio();
+      // Start audible playback from the tap first, then prepare the microphone
+      // while the example is playing. Capture can begin at the ended event
+      // without adding an artificial countdown or recording the example.
+      const referenceCompleted = await prepareDuringPlayback(
+        (onPlaybackStarted) => playReferenceAudio(onPlaybackStarted),
+        () => recorder.prepare()
+      );
       if (recorderRef.current !== recorder) {
         await recorder.cancel();
         return;
@@ -957,54 +1100,33 @@ function AuthenticatedApplication() {
         }
         await recorder.cancel();
         recorderRef.current = null;
+        cancelLiveSpeechTestSession();
         setGuidedPracticePhase("idle");
         return;
       }
-      setGuidedPracticePhase("preparing");
-      await recorder.prepare();
-      if (recorderRef.current !== recorder) {
-        await recorder.cancel();
-        return;
-      }
+      startLiveSpeechTestCapture();
       await beginGuidedRecording(recorder);
     } catch (error) {
       clearRecordingTimers();
-      recordingLeadInRef.current = false;
       await recorder.cancel();
+      cancelLiveSpeechTestSession();
       if (recorderRef.current !== recorder) return;
       if (recorderRef.current === recorder) recorderRef.current = null;
       setIsRecording(false);
       setGuidedPracticePhase("idle");
       markMicrophoneFailure(error);
-      setError(t.micError);
+      setError(getPracticeIssue(error, "microphone", locale));
       if (automaticPracticeActiveRef.current) deactivateAutomaticPractice(t.automaticPracticeErrorStop, "bad", "service-error");
     }
   }
 
   async function beginGuidedRecording(recorder: WavRecorder) {
     if (!sentence || recorderRef.current !== recorder) return;
-    setGuidedPracticePhase("preparing");
-    for (let count = 3; count >= 1; count -= 1) {
-      setRecordingCountdown(count);
-      const waitMs = count === 1 ? recordingCountdownStepMs - recordingLeadInMs : recordingCountdownStepMs;
-      await new Promise<void>((resolve) => window.setTimeout(resolve, waitMs));
-      if (recorderRef.current !== recorder) return;
-      if (count === 1) {
-        recordingLeadInRef.current = true;
-        await recorder.start();
-        if (recorderRef.current !== recorder) {
-          recordingLeadInRef.current = false;
-          return;
-        }
-        await new Promise<void>((resolve) => window.setTimeout(resolve, recordingLeadInMs));
-        if (recorderRef.current !== recorder) {
-          recordingLeadInRef.current = false;
-          return;
-        }
-      }
+    await recorder.start();
+    if (recorderRef.current !== recorder) {
+      await recorder.cancel();
+      return;
     }
-    setRecordingCountdown(0);
-    recordingLeadInRef.current = false;
     setIsRecording(true);
     setGuidedPracticePhase("waiting");
 
@@ -1029,8 +1151,14 @@ function AuthenticatedApplication() {
     setError("");
     setGuidedPracticePhase("listening");
     try {
-      const referenceCompleted = await playReferenceAudio();
-      if (recorderRef.current !== recorder) return;
+      const referenceCompleted = await prepareDuringPlayback(
+        (onPlaybackStarted) => playReferenceAudio(onPlaybackStarted),
+        () => recorder.prepare()
+      );
+      if (recorderRef.current !== recorder) {
+        await recorder.cancel();
+        return;
+      }
       if (!referenceCompleted) {
         if (referencePlaybackFailureRef.current === "blocked") {
           setError("");
@@ -1039,26 +1167,22 @@ function AuthenticatedApplication() {
         }
         await recorder.cancel();
         recorderRef.current = null;
+        cancelLiveSpeechTestSession();
         setGuidedPracticePhase("idle");
         return;
       }
-      setGuidedPracticePhase("preparing");
-      await recorder.prepare();
-      if (recorderRef.current !== recorder) {
-        await recorder.cancel();
-        return;
-      }
+      startLiveSpeechTestCapture();
       await beginGuidedRecording(recorder);
     } catch (error) {
       clearRecordingTimers();
-      recordingLeadInRef.current = false;
       await recorder.cancel();
+      cancelLiveSpeechTestSession();
       if (recorderRef.current !== recorder) return;
       recorderRef.current = null;
       setIsRecording(false);
       setGuidedPracticePhase("idle");
       markMicrophoneFailure(error);
-      setError(t.micError);
+      setError(getPracticeIssue(error, "microphone", locale));
       if (automaticPracticeActiveRef.current) deactivateAutomaticPractice(t.automaticPracticeErrorStop, "bad", "service-error");
     }
   }
@@ -1105,25 +1229,30 @@ function AuthenticatedApplication() {
     queueAutomaticRetry(currentSentence);
   }
 
-  async function stopRecording() {
+  async function stopRecording({ recorderTailMs }: { recorderTailMs?: number } = {}) {
     if (!sentence || !recorderRef.current || stopRecordingInFlightRef.current) return;
     const scoredSentence = sentence;
     const scoredSentenceIndex = sentenceIndex;
     const scoredLesson = lesson;
     const automaticSessionId = automaticPracticeSessionRef.current;
+    const liveSpeechTestRunId = liveSpeechTestSessionRef.current ? liveSpeechTestRunIdRef.current : "";
     stopRecordingInFlightRef.current = true;
     clearRecordingTimers();
+    finishLiveSpeechTestCapture();
     setIsRecording(false);
     setIsScoring(true);
     setGuidedPracticePhase("scoring");
 
     try {
-      const recording = await recorderRef.current.stop();
-      const nextAttempt = await submitAttempt(scoredSentence, recording, activeChild?.id);
+      const recording = await recorderRef.current.stop({ tailMs: recorderTailMs });
+      const nextAttempt = await submitAttempt(scoredSentence, recording, activeChild?.id, {
+        liveSpeechTestRunId: liveSpeechTestRunId || undefined
+      });
       setAnimatedScore(0);
       setAttempt(nextAttempt);
       setAttemptSource("current");
-      const completesCurrentItem = nextAttempt.passed || scoredSentence.required === false;
+      const completesCurrentItem =
+        nextAttempt.passed || (scoredSentence.required === false && nextAttempt.result.SuggestedScore > 0);
       if (completesCurrentItem && scoredSentenceIndex === passedCount) {
         setPassedCount((value) => value + 1);
         if (
@@ -1140,6 +1269,7 @@ function AuthenticatedApplication() {
         const outcome = decideAutomaticScoreOutcome({
           passed: nextAttempt.passed,
           required: scoredSentence.required !== false,
+          suggestedScore: nextAttempt.result.SuggestedScore,
           hasNext: scoredSentenceIndex < scoredLesson.sentences.length - 1,
           failedCount: automaticFailedAttemptCountRef.current
         });
@@ -1150,11 +1280,6 @@ function AuthenticatedApplication() {
         if (outcome.action === "next" || outcome.action === "complete") {
           resetAutomaticAttemptCounters(scoredSentence.id);
           queueAutomaticNext(scoredSentence, scoredSentenceIndex, scoredLesson);
-        } else if (outcome.action === "retry") {
-          if (automaticAttemptSentenceIdRef.current !== scoredSentence.id) resetAutomaticAttemptCounters(scoredSentence.id);
-          automaticFailedAttemptCountRef.current = outcome.failedCount;
-          setAutomaticFailedAttemptCount(outcome.failedCount);
-          queueAutomaticRetry(scoredSentence);
         } else {
           deactivateAutomaticPractice(t.automaticPracticeFailureStop, "warn", "failed-attempts");
         }
@@ -1163,15 +1288,20 @@ function AuthenticatedApplication() {
       const automaticSessionIsCurrent =
         automaticPracticeActiveRef.current && automaticPracticeSessionRef.current === automaticSessionId;
       if (err instanceof RecordingQualityError) {
-        const message =
-          err.code === "too-short"
-            ? t.recordingTooShort
-            : err.code === "no-speech"
-              ? t.noSpeechDetected
-              : err.code === "capture-gap"
-                ? t.recordingInterrupted
-                : t.recordingTooQuiet;
-        setError(message);
+        setError(getPracticeIssue(err, "recording", locale));
+        if (err.recording && activeChild?.id) {
+          void submitRejectedAttemptDiagnostic({
+            childId: activeChild.id,
+            sentence: scoredSentence,
+            recording: err.recording,
+            rejectionCode: err.code,
+            sourceType: "lesson",
+            contentId: scoredLesson?.id,
+            contentTitle: scoredLesson?.title
+          }).catch((diagnosticError) => {
+            console.warn("Unable to save rejected recording diagnostic.", diagnosticError);
+          });
+        }
         if (automaticSessionIsCurrent) {
           const failure = decideAutomaticRecordingFailure({
             kind: err.code === "capture-gap" ? "capture-gap" : "no-speech",
@@ -1181,19 +1311,17 @@ function AuthenticatedApplication() {
           else handleAutomaticNoSpeech(scoredSentence);
         }
       } else if (err instanceof AttemptSubmissionError && err.code === "NO_SPEECH_DETECTED") {
-        setError(t.noSpeechDetected);
+        setError(getPracticeIssue(err, "scoring", locale));
         if (automaticSessionIsCurrent) handleAutomaticNoSpeech(scoredSentence);
       } else if (err instanceof AttemptSubmissionError && err.code === "RECORDING_TOO_NOISY") {
-        setError(t.recordingTooNoisy);
+        setError(getPracticeIssue(err, "scoring", locale));
         if (automaticSessionIsCurrent) handleAutomaticNoSpeech(scoredSentence);
       } else {
-        setError(err instanceof Error ? err.message : t.scoreError);
+        setError(getPracticeIssue(err, "scoring", locale));
         if (automaticSessionIsCurrent) deactivateAutomaticPractice(t.automaticPracticeErrorStop, "bad", "service-error");
       }
     } finally {
       setIsScoring(false);
-      recordingLeadInRef.current = false;
-      setRecordingCountdown(0);
       setGuidedPracticePhase("idle");
       recorderRef.current = null;
       stopRecordingInFlightRef.current = false;
@@ -1252,6 +1380,7 @@ function AuthenticatedApplication() {
   }
 
   function stopReferenceAudio(clearState = true) {
+    referencePlaybackRunRef.current += 1;
     if (isFilingReviewSandbox && "speechSynthesis" in window) window.speechSynthesis.cancel();
     if (referencePlaybackResolverRef.current) {
       const resolvePlayback = referencePlaybackResolverRef.current;
@@ -1262,7 +1391,8 @@ function AuthenticatedApplication() {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      audioRef.current = null;
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
     }
     if (clearState) {
       setPlayingSentenceId("");
@@ -1296,21 +1426,34 @@ function AuthenticatedApplication() {
     audioFrameRef.current = window.requestAnimationFrame(tick);
   }
 
-  async function playReferenceAudio(): Promise<boolean> {
+  async function playReferenceAudio(onPlaybackStarted?: () => void): Promise<boolean> {
     if (!sentence || !selectedVoiceId || isRecording || isScoring) return false;
 
     setError("");
     stopAttemptAudio();
     stopReferenceAudio();
     referencePlaybackFailureRef.current = null;
+    const playbackRun = referencePlaybackRunRef.current;
 
     const currentSentence = sentence;
     const currentVoiceId = selectedVoiceId;
+    let playbackStarted = false;
+    const signalPlaybackStarted = () => {
+      if (playbackStarted) return;
+      playbackStarted = true;
+      onPlaybackStarted?.();
+    };
     const subtitlesPromise = fetchReferenceSubtitles(currentSentence, currentVoiceId)
       .then((response) => response.subtitles || [])
       .catch(() => [] as TtsSubtitle[]);
 
-    const audio = new Audio(getReferenceAudioUrl(currentSentence, currentVoiceId));
+    // Keep the element unlocked by the child's first tap. WebKit can block a
+    // later automatic clip when each sentence creates a new Audio element.
+    const audio = prepareSequentialAudio(
+      audioRef.current,
+      getReferenceAudioUrl(currentSentence, currentVoiceId),
+      () => new Audio()
+    );
     let settlePlayback: (completed: boolean) => void = () => undefined;
     const playbackCompleted = new Promise<boolean>((resolve) => {
       let settled = false;
@@ -1349,16 +1492,19 @@ function AuthenticatedApplication() {
       setError("");
       setPlayingSentenceId(currentSentence.id);
       utterance.onend = () => {
+        if (referencePlaybackRunRef.current !== playbackRun) return;
         setPlayingSentenceId("");
         setReferenceAudioProgress(0);
         setReferenceAudioTimeMs(0);
         settlePlayback(true);
       };
       utterance.onerror = () => {
+        if (referencePlaybackRunRef.current !== playbackRun) return;
         setPlayingSentenceId("");
-        setError(t.audioConfigError);
+        setError(getPracticeIssue({ code: "TTS_FAILED" }, "tts", locale));
         settlePlayback(false);
       };
+      signalPlaybackStarted();
       window.speechSynthesis.speak(utterance);
       return true;
     };
@@ -1367,41 +1513,43 @@ function AuthenticatedApplication() {
     setReferenceAudioProgress(0);
     setReferenceAudioTimeMs(0);
     setReferenceSubtitles([]);
-    audio.addEventListener("ended", () => {
+    audio.onended = () => {
+      if (referencePlaybackRunRef.current !== playbackRun) return;
       cancelReferenceAudioFrame();
-      if (audioRef.current === audio) audioRef.current = null;
       setPlayingSentenceId("");
       setReferenceAudioProgress(0);
       setReferenceAudioTimeMs(0);
       settlePlayback(true);
-    });
-    audio.addEventListener("error", () => {
+    };
+    audio.onerror = () => {
+      if (referencePlaybackRunRef.current !== playbackRun) return;
       cancelReferenceAudioFrame();
-      if (audioRef.current === audio) audioRef.current = null;
       setPlayingSentenceId("");
       setReferenceAudioProgress(0);
       setReferenceAudioTimeMs(0);
       setReferenceSubtitles([]);
       if (reviewFallbackStarted || startReviewDeviceVoice()) return;
       referencePlaybackFailureRef.current = "failed";
-      setError(t.audioConfigError);
+      setError(getPracticeIssue({ code: "TTS_FAILED" }, "tts", locale));
       settlePlayback(false);
-    });
+    };
 
     try {
       await audio.play();
+      if (referencePlaybackRunRef.current !== playbackRun) return playbackCompleted;
+      signalPlaybackStarted();
       trackReferenceAudioProgress(audio);
       void subtitlesPromise.then((subtitles) => {
-        if (audioRef.current !== audio) return;
+        if (audioRef.current !== audio || referencePlaybackRunRef.current !== playbackRun) return;
         console.info(
           `[tts-subtitles] voice=${currentVoiceId} sentence=${currentSentence.id} subtitles=${subtitles.length} mode=${subtitles.length > 0 ? "timed" : "fallback"}`
         );
         setReferenceSubtitles(subtitles);
       });
     } catch (error) {
+      if (referencePlaybackRunRef.current !== playbackRun) return playbackCompleted;
       cancelReferenceAudioFrame();
       audio.pause();
-      if (audioRef.current === audio) audioRef.current = null;
       setPlayingSentenceId("");
       setReferenceAudioProgress(0);
       setReferenceAudioTimeMs(0);
@@ -1409,7 +1557,7 @@ function AuthenticatedApplication() {
       const wasBlocked = error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
       if (!wasBlocked && (reviewFallbackStarted || startReviewDeviceVoice())) return playbackCompleted;
       referencePlaybackFailureRef.current = wasBlocked ? "blocked" : "failed";
-      setError(wasBlocked ? t.audioPermissionError : t.audioConfigError);
+      setError(getPracticeIssue(wasBlocked ? { name: "NotAllowedError", code: "AUDIO_BLOCKED" } : error, "tts", locale));
       settlePlayback(false);
     }
     return playbackCompleted;
@@ -1845,23 +1993,16 @@ function AuthenticatedApplication() {
           : t.practiceTip;
 
     const voicePicker = (
-      <label className="voice-picker compact-voice-picker ui-voice-pill">
-        <span>{t.voice}</span>
-        <select
-          value={selectedVoiceId}
-          onChange={(event) => {
-            stopReferenceAudio();
-            setSelectedVoiceId(event.target.value);
-          }}
-          disabled={guidedPracticePhase !== "idle"}
-        >
-          {ttsVoices.map((voice) => (
-            <option key={voice.id} value={voice.id}>
-              {voice.name} - {voice.description}
-            </option>
-          ))}
-        </select>
-      </label>
+      <VoicePicker
+        disabled={guidedPracticePhase !== "idle"}
+        label={t.voice}
+        onChange={(voiceId) => {
+          stopReferenceAudio();
+          setSelectedVoiceId(voiceId);
+        }}
+        value={selectedVoiceId}
+        voices={ttsVoices}
+      />
     );
 
     const recordControls = (
@@ -1869,7 +2010,7 @@ function AuthenticatedApplication() {
       <div className="stage-record-controls live-stage-controls ui-stage-actions">
         <button
           className="listen-button ui-btn ui-btn--listen ui-btn--pill"
-          onClick={playReferenceAudio}
+          onClick={() => void playReferenceAudio()}
           disabled={!selectedVoiceId || guidedPracticePhase !== "idle" || isReferencePlaying || isAutomaticPracticeActive}
           type="button"
         >
@@ -1881,13 +2022,18 @@ function AuthenticatedApplication() {
           <RecordOrb icon={<Volume2 size={34} />} label={t.playToContinue} onClick={resumeGuidedPracticeAfterAudioBlock} />
         ) : !isRecording ? (
           <RecordOrb
-            icon={recordingCountdown > 0 ? <span className="recording-countdown-number" key={recordingCountdown}>{recordingCountdown}</span> : <Mic size={38} />}
+            icon={<Mic size={38} />}
             label={guidedPracticeLabel}
             onClick={startAutomaticPractice}
-            disabled={!microphoneReady || guidedPracticePhase !== "idle" || isAutomaticPracticeActive}
+            disabled={
+              currentSelectionCompleted ||
+              !microphoneReady ||
+              guidedPracticePhase !== "idle" ||
+              isAutomaticPracticeActive
+            }
           />
         ) : (
-          <RecordOrb recording wave icon={<Square size={34} />} label={t.finish} onClick={stopRecording} />
+          <RecordOrb recording wave icon={<Square size={34} />} label={t.finish} onClick={() => void stopRecording()} />
         )}
 
         {(canGoNext || isLessonComplete) && !isAutomaticPracticeActive ? (
@@ -1979,21 +2125,8 @@ function AuthenticatedApplication() {
                   <Volume2 size={17} />
                   {playingAttemptAudioId === `${attempt.id}:enhanced`
                     ? t.playingMyRecording
-                    : attempt.speechEnhancement?.applied
-                      ? t.listenEnhancedRecording
-                      : t.listenToMyRecording}
+                    : t.listenToMyRecording}
                 </button>
-                {attempt.rawAudioAvailable && (
-                  <button
-                    className={`attempt-audio-button secondary ${playingAttemptAudioId === `${attempt.id}:raw` ? "playing" : ""}`}
-                    disabled={isRecording || isScoring}
-                    onClick={() => playAttemptAudio("raw")}
-                    type="button"
-                  >
-                    <Volume2 size={17} />
-                    {playingAttemptAudioId === `${attempt.id}:raw` ? t.playingMyRecording : t.listenRawRecording}
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -2035,45 +2168,6 @@ function AuthenticatedApplication() {
             </div>
           )}
         </div>
-
-        {attempt.speechProviderComparison && (
-          <details className="provider-ab-panel">
-            <summary>
-              <strong>{t.providerAbTitle}</strong>
-              <span>{t.providerAbHint}</span>
-            </summary>
-            <div className="provider-ab-grid">
-              {[attempt.speechProviderComparison.primary, attempt.speechProviderComparison.shadow].map((providerResult, index) => (
-                <section
-                  className={providerResult.status === "error" ? "error" : providerResult.providerRejected ? "rejected" : ""}
-                  key={`${providerResult.provider}-${index}`}
-                >
-                  <header>
-                    <strong>{providerResult.provider.toUpperCase()}</strong>
-                    <em>{index === 0 ? "PRIMARY" : "SHADOW"}</em>
-                  </header>
-                  {providerResult.status === "error" ? (
-                    <p>{t.providerAbError}: {providerResult.error}</p>
-                  ) : (
-                    <>
-                      {providerResult.providerRejected && (
-                        <p className="provider-ab-rejected">
-                          {formatMessage(t.providerAbRejected, { code: providerResult.providerExceptionCode || 0 })}
-                        </p>
-                      )}
-                      <dl>
-                        <div><dt>{t.providerAbScore}</dt><dd>{Math.round(providerResult.suggestedScore || 0)}</dd></div>
-                        <div><dt>{t.providerAbAccuracy}</dt><dd>{Math.round(providerResult.pronAccuracy || 0)}%</dd></div>
-                        <div><dt>{t.providerAbCompletion}</dt><dd>{Math.round((providerResult.pronCompletion || 0) * 100)}%</dd></div>
-                        <div><dt>{t.providerAbLatency}</dt><dd>{providerResult.durationMs}ms</dd></div>
-                      </dl>
-                    </>
-                  )}
-                </section>
-              ))}
-            </div>
-          </details>
-        )}
 
         {!attempt.passed && !isOptionalWord && (
           <StatusBanner tone="warn" className="retry-notice stage-retry-notice" icon={<AlertCircle size={22} />}>
@@ -2166,9 +2260,11 @@ function AuthenticatedApplication() {
               {recordControls}
               {microphonePermissionBanner}
               {error && (
-                <StatusBanner tone="bad" className="stage-inline-message">
-                  {error}
-                </StatusBanner>
+                typeof error === "string" ? (
+                  <StatusBanner tone="bad" className="stage-inline-message">{error}</StatusBanner>
+                ) : (
+                  <PracticeIssueNotice issue={error} className="stage-inline-message" />
+                )
               )}
             </div>
           </StageCard>
@@ -2266,9 +2362,11 @@ function AuthenticatedApplication() {
           {microphonePermissionBanner}
 
           {error && (
-            <StatusBanner tone="bad" className="stage-inline-message">
-              {error}
-            </StatusBanner>
+            typeof error === "string" ? (
+              <StatusBanner tone="bad" className="stage-inline-message">{error}</StatusBanner>
+            ) : (
+              <PracticeIssueNotice issue={error} className="stage-inline-message" />
+            )
           )}
 
           {feedbackBlock}

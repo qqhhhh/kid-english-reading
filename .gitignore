@@ -9,11 +9,13 @@ server/data/
 playwright-report/
 test-results/
 .tmp-build/
+.server-build/
 debug.log
 .dev-api*.log
 .dev-vite*.log
 .dev-combined*.log
 .local-ai/
+public/storybooks/
 *.sqlite
 *.sqlite-*
 *.db

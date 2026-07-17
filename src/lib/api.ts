@@ -1,7 +1,12 @@
 import type {
   Attempt,
+  AttemptCalibrationReview,
+  AttemptCalibrationSummary,
+  AttemptDiagnosticResponse,
   AutomaticPracticeSession,
   ChildProfile,
+  CalibrationLabel,
+  ClientDeviceDiagnostics,
   CourseLibraryResource,
   CourseSyncDraft,
   CourseSyncResult,
@@ -12,6 +17,7 @@ import type {
   PlatformCourseCandidate,
   Lesson,
   LessonProgress,
+  LiveSpeechComparison,
   PdfImportPreview,
   GeneratedRegistrationKey,
   RegistrationKeySnapshot,
@@ -24,11 +30,39 @@ import type { PictureBook } from "../data/pictureBooks";
 
 export class AttemptSubmissionError extends Error {
   code?: string;
+  status?: number;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, status?: number) {
     super(message);
     this.name = "AttemptSubmissionError";
     this.code = code;
+    this.status = status;
+  }
+}
+
+const attemptSubmissionTimeoutMs = 150_000;
+
+async function postAttemptForm(form: FormData, fallbackMessage: string) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), attemptSubmissionTimeoutMs);
+  try {
+    const response = await fetch("/api/attempts", {
+      method: "POST",
+      body: form,
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new AttemptSubmissionError(payload?.error || fallbackMessage, payload?.code, response.status);
+    }
+    return response;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new AttemptSubmissionError("Scoring request timed out", "NETWORK_TIMEOUT", 408);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 
@@ -40,6 +74,36 @@ type PracticeBookItemPatch = {
 
 type LessonSentenceInput = Partial<Omit<Sentence, "minScore" | "chapterId">> & { text: string };
 const adminMutationHeader = { "X-Admin-Request": "1" } as const;
+
+type NavigatorConnection = {
+  effectiveType?: string;
+  downlink?: number;
+  rtt?: number;
+  saveData?: boolean;
+};
+
+function getClientDeviceDiagnostics(): ClientDeviceDiagnostics {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return {};
+  const connection = (navigator as Navigator & { connection?: NavigatorConnection }).connection;
+  return {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    language: navigator.language,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    screen: { width: window.screen.width, height: window.screen.height },
+    devicePixelRatio: window.devicePixelRatio,
+    maxTouchPoints: navigator.maxTouchPoints,
+    online: navigator.onLine,
+    ...(connection ? {
+      connection: {
+        effectiveType: connection.effectiveType,
+        downlink: connection.downlink,
+        rtt: connection.rtt,
+        saveData: connection.saveData
+      }
+    } : {})
+  };
+}
 
 export type ParentSession = {
   kind: "parent";
@@ -333,6 +397,42 @@ export async function fetchAttempt(attemptId: string, childId: string): Promise<
     throw new Error("Unable to load attempt");
   }
   return response.json();
+}
+
+export async function fetchAttemptDiagnostics(input: {
+  childId?: string;
+  query?: string;
+  limit?: number;
+} = {}): Promise<AttemptDiagnosticResponse> {
+  const params = new URLSearchParams();
+  if (input.childId) params.set("childId", input.childId);
+  if (input.query) params.set("query", input.query);
+  params.set("limit", String(input.limit || 100));
+  const response = await fetch(`/api/admin/attempt-diagnostics?${params.toString()}`);
+  if (!response.ok) throw new Error("Unable to load scoring diagnostics");
+  return response.json();
+}
+
+export async function updateAttemptCalibration(input: {
+  attemptId: string;
+  childId: string;
+  label: CalibrationLabel | "";
+  note?: string;
+}): Promise<{ calibration?: AttemptCalibrationReview; calibrationSummary: AttemptCalibrationSummary }> {
+  const response = await fetch(`/api/admin/attempt-diagnostics/${encodeURIComponent(input.attemptId)}/calibration`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ childId: input.childId, label: input.label, note: input.note || "" })
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(body.error || "Unable to save calibration review"));
+  return body;
+}
+
+export function getAttemptDiagnosticAudioUrl(attemptId: string, childId: string, variant: "enhanced" | "raw" = "enhanced") {
+  const params = new URLSearchParams({ childId });
+  if (variant === "raw") params.set("variant", "raw");
+  return `/api/admin/attempt-diagnostics/${encodeURIComponent(attemptId)}/audio?${params.toString()}`;
 }
 
 export function getAttemptAudioUrl(attemptId: string, childId: string, variant: "enhanced" | "raw" = "enhanced") {
@@ -728,17 +828,67 @@ export async function updateLessonStatus(lessonId: string, status: "published" |
 export async function submitAttempt(
   sentence: Sentence,
   recording: WavRecording,
-  childId?: string
+  childId?: string,
+  options: { liveSpeechTestRunId?: string } = {}
 ): Promise<Attempt> {
+  const itemType = sentence.itemType === "word" ? "word" : sentence.itemType === "reading" ? "paragraph" : "sentence";
+  const recordingQuality = JSON.stringify(recording.quality);
+  const clientDevice = JSON.stringify(getClientDeviceDiagnostics());
+  const requestStartedAt = performance.now();
+
+  if (options.liveSpeechTestRunId && childId) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), attemptSubmissionTimeoutMs);
+    try {
+      const response = await fetch("/api/attempts/live", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          childId,
+          sentenceId: sentence.id,
+          referenceText: sentence.text,
+          itemType,
+          liveSpeechTestRunId: options.liveSpeechTestRunId,
+          minScore: String(sentence.minScore),
+          durationMs: String(recording.durationMs),
+          recordingQuality,
+          clientDevice
+        }),
+        signal: controller.signal
+      });
+      if (response.ok) {
+        const attempt = await response.json() as Attempt;
+        attempt.processingTimings = {
+          ...attempt.processingTimings,
+          clientRoundTripMs: Math.round(performance.now() - requestStartedAt)
+        };
+        return attempt;
+      }
+      const payload = await response.json().catch(() => null);
+      if (response.status !== 409 || payload?.code !== "LIVE_SPEECH_FALLBACK_REQUIRED") {
+        throw new AttemptSubmissionError(payload?.error || "Unable to finalize live reading", payload?.code, response.status);
+      }
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new AttemptSubmissionError("Scoring request timed out", "NETWORK_TIMEOUT", 408);
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
   const form = new FormData();
   if (childId) {
     form.append("childId", childId);
   }
   form.append("sentenceId", sentence.id);
   form.append("referenceText", sentence.text);
+  form.append("itemType", itemType);
   form.append("minScore", String(sentence.minScore));
   form.append("durationMs", String(recording.durationMs));
-  form.append("recordingQuality", JSON.stringify(recording.quality));
+  form.append("recordingQuality", recordingQuality);
+  form.append("clientDevice", clientDevice);
   form.append(
     "candidateMetadata",
     JSON.stringify([
@@ -766,17 +916,55 @@ export async function submitAttempt(
     form.append("candidateAudio", candidate.blob, `${sentence.id}-${candidate.id}.wav`);
   });
 
-  const response = await fetch("/api/attempts", {
+  const response = await postAttemptForm(form, "Unable to score reading");
+  const attempt = await response.json() as Attempt;
+  attempt.processingTimings = {
+    ...attempt.processingTimings,
+    clientRoundTripMs: Math.round(performance.now() - requestStartedAt)
+  };
+  return attempt;
+}
+
+export async function attachLiveSpeechTestResult(input: {
+  runId: string;
+  attemptId: string;
+  childId: string;
+}): Promise<LiveSpeechComparison> {
+  const response = await fetch(`/api/speech/live-results/${encodeURIComponent(input.runId)}/attach`, {
     method: "POST",
-    body: form
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attemptId: input.attemptId, childId: input.childId })
   });
+  if (!response.ok) throw new Error("Unable to attach live speech comparison");
+  return response.json() as Promise<LiveSpeechComparison>;
+}
 
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new AttemptSubmissionError(payload?.error || "Unable to score reading", payload?.code);
-  }
-
-  return response.json();
+export async function submitRejectedAttemptDiagnostic(input: {
+  childId: string;
+  sentence: Sentence;
+  recording: WavRecording;
+  rejectionCode: string;
+  sourceType?: "lesson" | "storybook";
+  contentId?: string;
+  contentTitle?: string;
+  storybookPageId?: string;
+}): Promise<{ id: string }> {
+  const form = new FormData();
+  form.append("childId", input.childId);
+  form.append("sentenceId", input.sentence.id);
+  form.append("referenceText", input.sentence.text);
+  form.append("rejectionCode", input.rejectionCode);
+  form.append("sourceType", input.sourceType || "lesson");
+  if (input.contentId) form.append("contentId", input.contentId);
+  if (input.contentTitle) form.append("contentTitle", input.contentTitle);
+  if (input.storybookPageId) form.append("storybookPageId", input.storybookPageId);
+  form.append("recordingQuality", JSON.stringify(input.recording.quality));
+  form.append("clientDevice", JSON.stringify(getClientDeviceDiagnostics()));
+  form.append("audio", input.recording.blob, `${input.sentence.id}-${input.rejectionCode}.wav`);
+  const response = await fetch("/api/attempt-diagnostics/rejections", { method: "POST", body: form });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(body.error || "Unable to save rejected attempt diagnostic"));
+  return body;
 }
 
 export async function submitStorybookAttempt(input: {
@@ -795,18 +983,21 @@ export async function submitStorybookAttempt(input: {
   form.append("minScore", String(input.sentence.minScore));
   form.append("durationMs", String(input.recording.durationMs));
   form.append("recordingQuality", JSON.stringify(input.recording.quality));
+  form.append("clientDevice", JSON.stringify(getClientDeviceDiagnostics()));
   form.append("candidateMetadata", JSON.stringify([
     ...input.recording.candidates.map((candidate) => ({ id: candidate.id, kind: candidate.kind, startedAtMs: candidate.startedAtMs, endedAtMs: candidate.endedAtMs, durationMs: candidate.durationMs, voiceDurationMs: candidate.voiceDurationMs, quality: candidate.quality })),
     { id: "full-session", kind: "full-session", startedAtMs: 0, endedAtMs: input.recording.durationMs, durationMs: input.recording.durationMs, quality: input.recording.quality }
   ]));
   form.append("audio", input.recording.blob, `${input.sentence.id}-full.wav`);
   input.recording.candidates.forEach((candidate) => form.append("candidateAudio", candidate.blob, `${input.sentence.id}-${candidate.id}.wav`));
-  const response = await fetch("/api/attempts", { method: "POST", body: form });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new AttemptSubmissionError(payload?.error || "Unable to score storybook reading", payload?.code);
-  }
-  return response.json();
+  const requestStartedAt = performance.now();
+  const response = await postAttemptForm(form, "Unable to score storybook reading");
+  const attempt = await response.json() as Attempt;
+  attempt.processingTimings = {
+    ...attempt.processingTimings,
+    clientRoundTripMs: Math.round(performance.now() - requestStartedAt)
+  };
+  return attempt;
 }
 
 export async function fetchStorybookAttempts(bookId: string, childId: string): Promise<Attempt[]> {

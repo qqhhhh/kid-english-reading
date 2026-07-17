@@ -9,9 +9,9 @@ Thank you for contributing.
 4. Run:
 
    \`\`\`text
-   npx tsc --noEmit
-   npm test
+   npm run typecheck
    npm run build
+   npm test
    git diff --check
    \`\`\`
 

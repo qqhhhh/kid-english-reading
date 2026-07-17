@@ -1,32 +1,35 @@
 {
-  "name": "kid-english-reading",
-  "version": "0.7.1",
+  "name": "kid-english-reading-mvp",
+  "version": "0.7.3",
   "private": true,
-  "description": "Self-hosted English reading and pronunciation practice for families.",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/qqhhhh/kid-english-reading.git"
-  },
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
   },
   "scripts": {
-    "dev": "node scripts/startDev.mjs",
+    "dev": "tsx scripts/startDev.ts",
     "dev:web": "vite --host 127.0.0.1 --port 5173 --strictPort",
-    "dev:api": "node server/dev.js",
-    "build": "tsc && vite build",
+    "dev:api": "node --import tsx server/dev.ts",
+    "typecheck": "npm run typecheck:client && npm run typecheck:server && npm run typecheck:tools",
+    "typecheck:client": "tsc --noEmit",
+    "typecheck:server": "tsc --project tsconfig.server.json --noEmit",
+    "typecheck:tools": "tsc --project tsconfig.tools.json && tsc --project tsconfig.browser-tests.json",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "tsc --noEmit && vite build",
+    "build:server": "tsc --project tsconfig.server.json",
+    "smoke:server-build": "npm run build:server && tsx scripts/smokeServerBuild.ts",
     "cap:doctor": "cap doctor",
     "cap:sync": "cap sync",
-    "key:create:dev": "node scripts/createRegistrationKey.mjs --dev",
-    "ocr:hunyuan:start": "node scripts/hunyuanOcrControl.mjs start",
-    "ocr:hunyuan:stop": "node scripts/hunyuanOcrControl.mjs stop",
-    "test": "node --test",
-    "test:visual": "node scripts/runVisualTests.mjs",
+    "key:create:dev": "tsx scripts/createRegistrationKey.ts --dev",
+    "ocr:hunyuan:start": "tsx scripts/hunyuanOcrControl.ts start",
+    "ocr:hunyuan:stop": "tsx scripts/hunyuanOcrControl.ts stop",
+    "ocr:paddle:start": "tsx scripts/paddleOcrControl.ts start",
+    "ocr:paddle:stop": "tsx scripts/paddleOcrControl.ts stop",
+    "test": "tsx --test",
+    "test:visual": "tsx scripts/runVisualTests.ts",
     "preview": "vite preview --host 127.0.0.1",
-    "start": "node server/index.js",
-    "server": "node server/index.js"
+    "start": "node .server-build/server/index.js",
+    "server": "node .server-build/server/index.js"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.1",
@@ -48,7 +51,8 @@
     "sherpa-onnx-node": "^1.13.3",
     "tesseract.js": "^7.0.0",
     "typescript": "^5.8.3",
-    "vite": "^7.0.2"
+    "vite": "^7.0.2",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
@@ -60,10 +64,9 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.1",
     "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-static-copy": "^3.1.2"
-  },
-  "overrides": {
-    "uuid": "^11.1.1"
   }
 }

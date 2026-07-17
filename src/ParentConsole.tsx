@@ -1,4 +1,5 @@
 import {
+  Activity,
   Archive,
   BarChart3,
   BookOpen,
@@ -23,6 +24,7 @@ import { AnalyticsOverview, type AnalyticsLessonStat, type AnalyticsRecentScore 
 import { CourseContentEditor } from "./components/course/CourseContentEditor";
 import { PdfImportLayersPanel } from "./components/pdf/PdfImportLayersPanel";
 import { PdfImportReviewSummary } from "./components/pdf/PdfImportReviewSummary";
+import { ScoringDiagnosticsPage } from "./components/parent/ScoringDiagnosticsPage";
 import { Badge, Button, EmptyState, IconButton, ProgressBar, ThemeSwitcher } from "./components/ui";
 import {
   addLessonToPracticeBook,
@@ -88,11 +90,11 @@ type DraftSentence = {
 
 type DetailMode = "none" | "create" | "existing";
 type LayoutPreview = "phone" | "tablet" | "desktop";
-type ParentSection = "overview" | "courses" | "course-library" | "practice" | "children" | "analytics" | "settings";
+type ParentSection = "overview" | "courses" | "course-library" | "practice" | "children" | "analytics" | "diagnostics" | "settings";
 type PracticeTaskDisplayStatus = "pending" | "in_progress" | "completed";
 type CourseSortMode = "updated" | "title" | "sentences";
 
-const PARENT_SECTIONS: ParentSection[] = ["overview", "courses", "course-library", "practice", "children", "analytics", "settings"];
+const PARENT_SECTIONS: ParentSection[] = ["overview", "courses", "course-library", "practice", "children", "analytics", "diagnostics", "settings"];
 
 const COURSE_LIBRARY_PAGE_SIZE = 10;
 const COURSE_MANAGEMENT_PAGE_SIZE = 12;
@@ -1634,6 +1636,7 @@ export function ParentConsole() {
               { id: "practice" as ParentSection, label: t.navPracticeBook, Icon: ClipboardList },
               { id: "children" as ParentSection, label: t.navChildren, Icon: Users },
               { id: "analytics" as ParentSection, label: t.navAnalytics, Icon: BarChart3 },
+              { id: "diagnostics" as ParentSection, label: t.navDiagnostics, Icon: Activity },
               { id: "settings" as ParentSection, label: t.navSettings, Icon: Settings }
             ].map(({ id, label, Icon }) => (
               <button
@@ -2517,6 +2520,15 @@ export function ParentConsole() {
                 }}
               />
             </section>
+          )}
+
+          {activeSection === "diagnostics" && (
+            <ScoringDiagnosticsPage
+              activeChildId={activeChildId}
+              children={children}
+              locale={locale}
+              onSelectChild={(childId) => void selectChild(childId)}
+            />
           )}
 
           {activeSection === "settings" && (

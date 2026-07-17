@@ -18,5 +18,7 @@ export { LayoutSwitcher } from "./LayoutSwitcher";
 export type { LayoutSwitcherProps } from "./LayoutSwitcher";
 export { ThemeSwitcher } from "./ThemeSwitcher";
 export type { ThemeSwitcherProps } from "./ThemeSwitcher";
+export { VoicePicker } from "./VoicePicker";
+export type { VoicePickerProps } from "./VoicePicker";
 export { WordChip } from "./WordChip";
 export type { WordChipProps, WordChipTone } from "./WordChip";

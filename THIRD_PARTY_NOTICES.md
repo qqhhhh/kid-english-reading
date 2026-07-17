@@ -16,7 +16,8 @@ User-imported content remains the responsibility of the user.
 
 ## Models and external services
 
-No GTCRN, HunyuanOCR, or other third-party model weights or executables are
-distributed. Provider adapters for Tencent, iFlytek, Azure, SenseNova, and
-OpenAI-compatible services require separately obtained accounts and are subject
-to the providers' own terms.
+No GTCRN, HunyuanOCR, PaddleOCR, or other third-party model weights or executables
+are distributed. Optional provider adapters for Tencent, iFlytek, and Azure require
+separately obtained accounts and are subject to the providers' own terms. The
+OpenAI TTS and AI-hint boundaries in this release are placeholders and do not make
+runtime OpenAI API calls.

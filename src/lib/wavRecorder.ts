@@ -27,9 +27,19 @@ export type WavRecording = {
 export type RecordingQualityErrorCode = "no-speech" | "too-short" | "too-quiet" | "capture-gap";
 
 export type WavRecorderCallbacks = {
+  onSignalSpeechStart?: () => void;
   onSpeechStart?: () => void;
   onSpeechEnd?: (segment: SpeechSegmentSummary, segments: SpeechSegmentSummary[]) => void;
   onVADMisfire?: () => void;
+  onAudioChunk?: (samples: Float32Array, inputSampleRate: number) => void;
+};
+
+export type WavRecorderOptions = WavRecorderCallbacks & {
+  vadRedemptionMs?: number;
+};
+
+export type WavRecorderStopOptions = {
+  tailMs?: number;
 };
 
 type CapturedSpeechSegment = SpeechSegmentSummary & {
@@ -58,16 +68,20 @@ type RecorderState = {
   capturing: boolean;
   recorderConnected: boolean;
   speechActive: boolean;
+  signalSpeechMs: number;
+  signalSpeechDetected: boolean;
   audioInput: NonNullable<RecordingQuality["audioInput"]>;
 };
 
 export class RecordingQualityError extends Error {
   code: RecordingQualityErrorCode;
+  recording?: WavRecording;
 
-  constructor(code: RecordingQualityErrorCode) {
+  constructor(code: RecordingQualityErrorCode, recording?: WavRecording) {
     super(code);
     this.name = "RecordingQualityError";
     this.code = code;
+    this.recording = recording;
   }
 }
 
@@ -79,6 +93,8 @@ const trailingPaddingMs = 350;
 const maxAlternateCandidates = 2;
 const captureGapMinimumMs = 450;
 const captureGapMaximumRatio = 0.08;
+const signalSpeechThreshold = 0.008;
+const signalSpeechMinimumMs = 80;
 
 function normalizeBooleanCapability(value: unknown) {
   if (!Array.isArray(value)) return undefined;
@@ -88,9 +104,9 @@ function normalizeBooleanCapability(value: unknown) {
 
 export class WavRecorder {
   private state: RecorderState | null = null;
-  private callbacks: WavRecorderCallbacks;
+  private callbacks: WavRecorderOptions;
 
-  constructor(callbacks: WavRecorderCallbacks = {}) {
+  constructor(callbacks: WavRecorderOptions = {}) {
     this.callbacks = callbacks;
   }
 
@@ -181,6 +197,8 @@ export class WavRecorder {
         capturing: false,
         recorderConnected: false,
         speechActive: false,
+        signalSpeechMs: 0,
+        signalSpeechDetected: false,
         audioInput
       };
 
@@ -188,6 +206,17 @@ export class WavRecorder {
         if (!state.capturing) return;
         const chunk = new Float32Array(input);
         state.chunks.push(chunk);
+        const chunkDurationMs = chunk.length / state.context.sampleRate * 1000;
+        if (measureSamples(chunk).rms >= signalSpeechThreshold) {
+          state.signalSpeechMs += chunkDurationMs;
+          if (state.signalSpeechMs >= signalSpeechMinimumMs && !state.signalSpeechDetected) {
+            state.signalSpeechDetected = true;
+            this.callbacks.onSignalSpeechStart?.();
+          }
+        } else {
+          state.signalSpeechMs = Math.max(0, state.signalSpeechMs - chunkDurationMs / 2);
+        }
+        this.callbacks.onAudioChunk?.(chunk, state.context.sampleRate);
         if (!state.vad) {
           processFallbackVoiceFrame(state, chunk, this.callbacks);
         }
@@ -220,7 +249,7 @@ export class WavRecorder {
           onnxWASMBasePath: "/vad/",
           positiveSpeechThreshold: 0.58,
           negativeSpeechThreshold: 0.35,
-          redemptionMs: 900,
+          redemptionMs: this.callbacks.vadRedemptionMs ?? 900,
           preSpeechPadMs: leadingPaddingMs,
           minSpeechMs: 280,
           submitUserSpeechOnPause: false,
@@ -267,6 +296,8 @@ export class WavRecorder {
     state.startedAt = performance.now();
     state.capturing = true;
     state.speechActive = false;
+    state.signalSpeechMs = 0;
+    state.signalSpeechDetected = false;
     state.source.connect(state.processor);
     state.processor.connect(state.context.destination);
     state.recorderConnected = true;
@@ -280,13 +311,14 @@ export class WavRecorder {
     }
   }
 
-  async stop(): Promise<WavRecording> {
+  async stop(options: WavRecorderStopOptions = {}): Promise<WavRecording> {
     const state = this.state;
     if (!state?.capturing) {
       throw new Error("Recorder has not started");
     }
 
-    await delay(stopTailMs);
+    const tailMs = Math.max(0, options.tailMs ?? stopTailMs);
+    if (tailMs > 0) await delay(tailMs);
     await flushRecorderCapture(state);
     state.capturing = false;
     const rawDurationMs = performance.now() - state.startedAt;
@@ -309,13 +341,11 @@ export class WavRecorder {
     full.quality.capturedDurationMs = round(capturedDurationMs);
     full.quality.captureGapMs = round(captureGapMs);
     full.quality.audioInput = state.audioInput;
-    assertRecordingQuality(full.quality, full.hasVoice, state.segments.length > 0 || state.speechActive);
-
     const candidates = state.segments.length > 1 ? buildAlternateCandidates(state.segments) : [];
     candidates.forEach((candidate) => {
       candidate.quality.audioInput = state.audioInput;
     });
-    return {
+    const recording: WavRecording = {
       blob: encodeWav(normalizeQuietRecording(full.samples, full.quality.peak), outputSampleRate),
       durationMs: full.quality.processedDurationMs,
       quality: {
@@ -325,6 +355,17 @@ export class WavRecorder {
       },
       candidates
     };
+    try {
+      assertRecordingQuality(
+        full.quality,
+        full.hasVoice,
+        state.segments.length > 0 || state.speechActive || state.signalSpeechDetected
+      );
+    } catch (error) {
+      if (error instanceof RecordingQualityError) error.recording = recording;
+      throw error;
+    }
+    return recording;
   }
 
   async cancel() {
@@ -339,7 +380,7 @@ export class WavRecorder {
   }
 }
 
-function processFallbackVoiceFrame(state: RecorderState, chunk: Float32Array, callbacks: WavRecorderCallbacks) {
+function processFallbackVoiceFrame(state: RecorderState, chunk: Float32Array, callbacks: WavRecorderOptions) {
   const frameRms = measureSamples(chunk).rms;
   const now = performance.now();
   const isStrongSpeech = frameRms >= 0.012;
@@ -362,7 +403,7 @@ function processFallbackVoiceFrame(state: RecorderState, chunk: Float32Array, ca
     return;
   }
 
-  if (now - state.fallbackVad.lastSpeechAt < 900) return;
+  if (now - state.fallbackVad.lastSpeechAt < (callbacks.vadRedemptionMs ?? 900)) return;
   const sourceSamples = mergeChunks(state.chunks.slice(state.fallbackVad.segmentStartChunk));
   const centered = removeDcOffset(sourceSamples);
   const audio = resample(centered, state.context.sampleRate, outputSampleRate);

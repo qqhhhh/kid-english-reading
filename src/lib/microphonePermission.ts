@@ -1,9 +1,29 @@
 export type MicrophoneAccessState = "checking" | "granted" | "denied" | "unavailable" | "skipped";
 
+interface MicrophonePermissionStatus {
+  state: PermissionState;
+}
+
+interface MicrophonePermissions {
+  query(descriptor: PermissionDescriptor): Promise<MicrophonePermissionStatus>;
+}
+
+interface MicrophoneTrack {
+  stop(): void;
+}
+
+interface MicrophoneStream {
+  getTracks(): MicrophoneTrack[];
+}
+
+interface MicrophoneMediaDevices {
+  getUserMedia(constraints?: MediaStreamConstraints): Promise<MicrophoneStream>;
+}
+
 type MicrophoneAccessEnvironment = {
   secureContext: boolean;
-  mediaDevices?: Pick<MediaDevices, "getUserMedia">;
-  permissions?: Pick<Permissions, "query">;
+  mediaDevices?: MicrophoneMediaDevices;
+  permissions?: MicrophonePermissions;
 };
 
 const microphoneConstraints: MediaStreamConstraints = {

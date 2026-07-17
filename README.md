@@ -2,9 +2,26 @@
 
 A self-hosted English reading and pronunciation practice application for families.
 
-The project provides a student practice interface, parent console, practice books,
-PDF-assisted course import, recording, word-level feedback, optional speech
-assessment providers, picture-book import, and a public in-memory product demo.
+The current open-source release tracks application version **v0.7.3**. It provides
+a child-friendly practice interface, a parent console, practice books, PDF-assisted
+course import, browser recording, streaming-first speech assessment, word-level
+feedback, scoring diagnostics, and a public in-memory product demo.
+
+## Highlights
+
+- React 19, Vite, strict TypeScript, Express, WebSocket, and SQLite.
+- Parent accounts, household isolation, and revocable child-device pairing.
+- Vocabulary, sentence, and paragraph practice with reference audio and automatic
+  progression only after the current required item passes.
+- AudioWorklet capture, browser voice activity detection, 16 kHz PCM streaming,
+  final-result identity checks, and one complete-recording fallback.
+- Word-level accuracy, completeness, fluency, missed-word handling, recording
+  validity checks, and policy-normalized historical best scores.
+- PDF layout parsing, Tesseract-based verification, optional local OCR adapters,
+  quality reports, and a human review workflow.
+- A parent diagnostics workspace for recordings, device metadata, provider results,
+  and human calibration labels.
+- 144 automated tests plus multi-device browser layout checks.
 
 ## Open-source edition
 
@@ -12,12 +29,12 @@ This repository contains source code only. It intentionally does **not** include
 
 - textbooks, commercial course content, PDFs, page images, or extracted text;
 - third-party picture books, illustrations, or narration;
-- speech-enhancement model files;
+- speech-enhancement or OCR model weights and executables;
 - student accounts, recordings, scores, SQLite databases, or logs;
-- API keys, cloud credentials, deployment secrets, or production configuration.
+- API keys, cloud credentials, production secrets, or deployment-specific settings.
 
-You are responsible for ensuring that content imported into your own installation
-is licensed for your use.
+You are responsible for ensuring that content imported into your installation is
+licensed for your use.
 
 ## Requirements
 
@@ -27,22 +44,15 @@ is licensed for your use.
 
 ## Run locally
 
-### 1. Install
-
-\`\`\`powershell
+```powershell
 git clone https://github.com/qqhhhh/kid-english-reading.git
 cd kid-english-reading
 npm install
 Copy-Item .env.example .env
-\`\`\`
-
-On macOS or Linux, use \`cp .env.example .env\`.
-
-### 2. Start
-
-\`\`\`powershell
 npm run dev
-\`\`\`
+```
+
+On macOS or Linux, use `cp .env.example .env`.
 
 The development launcher starts:
 
@@ -52,84 +62,64 @@ The development launcher starts:
 
 The demo uses in-memory sample data and does not write student progress.
 
-### 3. Create a local family account
+### Create a local family account
 
-Generate a one-time local registration key:
-
-\`\`\`powershell
+```powershell
 npm run key:create:dev -- --label "local development" --days 30
-\`\`\`
+```
 
 Open <http://127.0.0.1:5173/login>, choose registration, and use the generated
 key to create a parent account. Development data is stored under
-\`server/data/dev/\` and is ignored by Git.
+`server/data/dev/` and is ignored by Git.
 
-## Default local behavior
+## Safe defaults
 
-The checked-in \`.env.example\` contains no cloud credentials:
+The checked-in `.env.example` contains no cloud credentials:
 
 - speech assessment uses the local mock provider;
-- speech enhancement is disabled because no model is bundled;
-- recording persistence is disabled by default;
-- PDF text extraction and local OCR remain available;
-- cloud TTS, cloud speech assessment, and cloud OCR require your own provider
-  account and credentials.
+- speech enhancement and recording persistence are disabled;
+- no demo family or course data is written automatically;
+- PDF text extraction and bundled Tesseract verification remain available;
+- cloud TTS, assessment, and optional OCR require your own provider credentials.
 
-The application can be opened and developed without any third-party key. Features
-that require an external provider remain unavailable until you explicitly configure
-one.
+Provider credentials must stay in the backend's untracked `.env` file. The browser
+never receives cloud API secrets. Tencent speech assessment and TTS, iFlytek and
+Azure diagnostic assessment, and local HunyuanOCR/PaddleOCR adapters are optional.
 
-## Optional providers
+The OpenAI TTS and AI-hint boundaries are reserved but are not implemented in this
+release; the project does not claim to call the OpenAI API at runtime.
 
-Provider adapters are included, but credentials are never included. Configure only
-the provider you intend to use in your private, untracked \`.env\` file.
+## Optional content and models
 
-| Capability | Provider | Environment variable names |
-| --- | --- | --- |
-| Speech assessment | Tencent | \`TENCENT_APP_ID\`, \`TENCENT_SECRET_ID\`, \`TENCENT_SECRET_KEY\` |
-| Text to speech | Tencent | the Tencent variables above plus optional TTS settings |
-| Shadow assessment | iFlytek | \`XFYUN_APP_ID\`, \`XFYUN_API_KEY\`, \`XFYUN_API_SECRET\` |
-| Speech assessment | Azure | \`AZURE_SPEECH_KEY\`, \`AZURE_SPEECH_REGION\` |
-| PDF OCR | iFlytek | \`XFYUN_PDF_OCR_APP_ID\`, \`XFYUN_PDF_OCR_SECRET\` |
-| Vision review | SenseNova | \`SENSENOVA_API_KEY\` or its AK/SK variables |
-| AI hints | OpenAI-compatible provider | \`OPENAI_API_KEY\`, \`OPENAI_MODEL\` |
-
-Refer to each provider's official documentation for account creation, regional
-availability, billing, and current API terms. Never place credentials in frontend
-code or commit them to Git.
-
-## Content and optional model files
-
-- Official picture-book resources are not bundled. Families can upload books they
-  are authorized to use.
-- Textbook PDFs and generated page images stay under \`server/data/\`.
-- The optional GTCRN enhancement model is not distributed here. If you have a
-  properly licensed compatible ONNX model, set \`SPEECH_ENHANCEMENT_MODEL\` to
-  its private local path and enable the provider in your untracked environment.
-- Local HunyuanOCR integration expects a separately installed compatible service;
-  models and executables are not distributed by this repository.
+- Families can import content they are authorized to use.
+- Uploaded PDFs, generated page images, recordings, and caches stay under
+  `server/data/`.
+- The optional GTCRN enhancement model is not distributed. Point
+  `SPEECH_ENHANCEMENT_MODEL` at a compatible model you are licensed to use.
+- HunyuanOCR and PaddleOCR integrations expect separately installed local services;
+  their model files and runtimes are not distributed by this repository.
 
 ## Validation
 
-\`\`\`powershell
-npx tsc --noEmit
-npm test
+```powershell
+npm run typecheck
 npm run build
-\`\`\`
+npm test
+git diff --check
+```
 
 ## Data and privacy
 
-SQLite databases, uploaded PDFs, page images, recordings, TTS caches, and logs are
-stored under \`server/data/\` and ignored by Git. Review your local retention
-policy before collecting recordings from children. Cloud providers receive audio
-or page samples only when you explicitly configure and enable the corresponding
-adapter.
+SQLite databases, uploaded files, recordings, TTS caches, and logs are ignored by
+Git. Review consent, retention, and cloud-provider policies before collecting or
+processing children's recordings. Back up SQLite and its WAL state before any
+migration or bulk repair.
 
 ## License
 
-Project source code is licensed under the [MIT License](LICENSE).
-Third-party dependencies remain under their respective licenses. No license is
-granted here for user-imported content or separately obtained models and media.
+Project source code is licensed under the [MIT License](LICENSE). Third-party
+dependencies remain under their respective licenses. No license is granted here
+for user-imported content or separately obtained models and media.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
 [SECURITY.md](SECURITY.md).

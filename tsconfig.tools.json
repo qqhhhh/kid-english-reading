@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "test/**/*.ts",
+    "test-support/**/*.ts",
+    "scripts/**/*.ts",
+    "server/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".server-build",
+    "server/data",
+    "test/historical-attempt.test.ts",
+    "test/microphone-permission.test.ts",
+    "test/practice-errors.test.ts"
+  ]
+}

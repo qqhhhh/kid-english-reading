@@ -1,10 +1,12 @@
 import { ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, Mic, Pause, Play, Sparkles, Volume2, X } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { findPictureBook, pictureBooks } from "../../data/pictureBooks";
-import { fetchChildren, fetchImportedStorybook, fetchStorybookAttempts, getStorybookTtsUrl, submitStorybookAttempt } from "../../lib/api";
+import { fetchChildren, fetchImportedStorybook, fetchStorybookAttempts, getStorybookTtsUrl, submitRejectedAttemptDiagnostic, submitStorybookAttempt } from "../../lib/api";
 import type { Attempt, ChildProfile, Sentence } from "../../lib/types";
 import type { PictureBook } from "../../data/pictureBooks";
-import { WavRecorder } from "../../lib/wavRecorder";
+import { RecordingQualityError, WavRecorder } from "../../lib/wavRecorder";
+import { getPracticeIssue, type PracticeIssue } from "../../lib/practiceErrors";
+import { PracticeIssueNotice } from "../practice/PracticeIssueNotice";
 
 export function PictureBookPrototype() {
   const params = new URLSearchParams(window.location.search);
@@ -28,7 +30,7 @@ function PictureBookReader({ book, requestedChildId }: { book: PictureBook; requ
   const [playing, setPlaying] = useState(false);
   const [recording, setRecording] = useState(false);
   const [scoring, setScoring] = useState(false);
-  const [recordingError, setRecordingError] = useState("");
+  const [recordingError, setRecordingError] = useState<string | PracticeIssue>("");
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [officialAudioPlaying, setOfficialAudioPlaying] = useState(false);
@@ -94,22 +96,26 @@ function PictureBookReader({ book, requestedChildId }: { book: PictureBook; requ
     const sentence = page.sentences[index];
     if (!sentence) return;
     const run = ++pagePlaybackRun.current;
+    setRecordingError("");
     setLineIndex(index);
     setRecording(false);
     setPlaying(true);
-    try { await playTtsText(sentence.text); } catch { /* The action card returns to its ready state. */ }
+    try { await playTtsText(sentence.text); }
+    catch (error) { setRecordingError(getPracticeIssue(error, "tts", "zh")); }
     if (pagePlaybackRun.current === run) setPlaying(false);
   }
   async function playWholePage() {
     if (playing) { stopTtsPlayback(); return; }
     if (officialAudio) { await toggleOfficialAudio(); return; }
     const run = ++pagePlaybackRun.current;
+    setRecordingError("");
     setRecording(false);
     setPlaying(true);
     for (let index = 0; index < page.sentences.length; index += 1) {
       if (pagePlaybackRun.current !== run) return;
       setLineIndex(index);
-      try { await playTtsText(page.sentences[index].text); } catch { break; }
+      try { await playTtsText(page.sentences[index].text); }
+      catch (error) { setRecordingError(getPracticeIssue(error, "tts", "zh")); break; }
     }
     if (pagePlaybackRun.current === run) setPlaying(false);
   }
@@ -122,7 +128,11 @@ function PictureBookReader({ book, requestedChildId }: { book: PictureBook; requ
       const recorder = new WavRecorder();
       recorderRef.current = recorder;
       try { await recorder.start(); setRecording(true); }
-      catch { await recorder.cancel(); recorderRef.current = null; setRecordingError("无法打开麦克风，请检查浏览器授权。"); }
+      catch (error) {
+        await recorder.cancel();
+        recorderRef.current = null;
+        setRecordingError(getPracticeIssue(error, "microphone", "zh"));
+      }
       return;
     }
     const recorder = recorderRef.current;
@@ -138,7 +148,21 @@ function PictureBookReader({ book, requestedChildId }: { book: PictureBook; requ
         advanceTimerRef.current = window.setTimeout(() => advanceAfter(pageIndex, lineIndex), 900);
       }
     } catch (error) {
-      setRecordingError(error instanceof Error && error.message.includes("No valid") ? "没有检测到有效朗读，请靠近麦克风再试一次。" : "这次没有评分成功，请再读一次。");
+      if (error instanceof RecordingQualityError && error.recording) {
+        void submitRejectedAttemptDiagnostic({
+          childId: activeChild.id,
+          sentence: { id: activeSentence.id, text: activeSentence.text, minScore: 75 },
+          recording: error.recording,
+          rejectionCode: error.code,
+          sourceType: "storybook",
+          contentId: book.id,
+          contentTitle: book.title,
+          storybookPageId: page.id
+        }).catch((diagnosticError) => {
+          console.warn("Unable to save rejected storybook recording diagnostic.", diagnosticError);
+        });
+      }
+      setRecordingError(getPracticeIssue(error, error instanceof RecordingQualityError ? "recording" : "scoring", "zh"));
     } finally {
       await recorder.cancel();
       recorderRef.current = null;
@@ -161,11 +185,17 @@ function PictureBookReader({ book, requestedChildId }: { book: PictureBook; requ
   }
   async function toggleOfficialAudio() {
     if (!officialAudio) return;
+    setRecordingError("");
     const current = officialAudioRef.current;
     if (current && current.src === new URL(officialAudio.url, window.location.href).href) {
       if (current.paused) {
-        await current.play();
-        setOfficialAudioPlaying(true);
+        try {
+          await current.play();
+          setOfficialAudioPlaying(true);
+        } catch (error) {
+          setOfficialAudioPlaying(false);
+          setRecordingError(getPracticeIssue(error, "tts", "zh"));
+        }
       } else {
         current.pause();
         setOfficialAudioPlaying(false);
@@ -176,12 +206,16 @@ function PictureBookReader({ book, requestedChildId }: { book: PictureBook; requ
     const audio = new Audio(officialAudio.url);
     officialAudioRef.current = audio;
     audio.addEventListener("ended", () => setOfficialAudioPlaying(false), { once: true });
-    audio.addEventListener("error", () => setOfficialAudioPlaying(false), { once: true });
+    audio.addEventListener("error", () => {
+      setOfficialAudioPlaying(false);
+      setRecordingError(getPracticeIssue({ code: "TTS_FAILED" }, "tts", "zh"));
+    }, { once: true });
     try {
       await audio.play();
       setOfficialAudioPlaying(true);
-    } catch {
+    } catch (error) {
       setOfficialAudioPlaying(false);
+      setRecordingError(getPracticeIssue(error, "tts", "zh"));
     }
   }
   function startSwipe(event: PointerEvent<HTMLDivElement>) {
@@ -214,7 +248,7 @@ function PictureBookReader({ book, requestedChildId }: { book: PictureBook; requ
         <div className="picture-book-progress"><span style={{ width: `${sentenceCount ? (completedSentenceCount / sentenceCount) * 100 : 0}%` }} /></div>
         <div className={`picture-book-progress-summary ${bookCompleted ? "completed" : ""}`}><strong>{bookCompleted ? "整本跟读完成！" : `已通过 ${completedSentenceCount} / ${sentenceCount} 句`}</strong><span>{bookCompleted ? "太棒了，继续保持阅读习惯～" : "读准一句，就点亮一颗故事星"}</span></div>
         <div className="picture-book-copy"><small>第 {pageIndex + 1} 页 · {page.sentences.length ? mode === "repeat" ? "选择一句开始跟读" : "点击句子听读音" : page.kind === "cover" ? "绘本封面" : "观察画面，感受故事停顿"}</small>{page.sentences.map((sentence, index) => <button className={`${lineIndex === index ? "active" : ""} ${passedSentenceIds.has(sentence.id) ? "done" : ""}`} key={sentence.id} onClick={() => void playSentence(index)} type="button"><span>{passedSentenceIds.has(sentence.id) ? <Check size={16} /> : index + 1}</span><strong>{sentence.text}</strong>{playing && lineIndex === index ? <Pause size={17} /> : <Volume2 size={17} />}</button>)}</div>
-        {activeSentence ? <div className={`picture-book-action-card ${recording ? "recording" : ""}`}><div><small>{recording ? "正在听你读…" : scoring ? "正在认真评分…" : playing ? "正在播放读音" : activeAttempt ? `历史最高 ${Math.round(Number(activeAttempt.result?.SuggestedScore || 0))} 分${activeAttempt.passed ? " · 已通过" : " · 再试一次"}` : "准备好了吗？"}</small><strong>{activeSentence.text}</strong></div><div className="picture-book-actions"><button className="listen" disabled={recording || scoring} onClick={() => void playSentence(lineIndex)} type="button">{playing ? <Pause /> : <Volume2 />}<span>{playing ? "暂停" : "听读音"}</span></button>{mode === "repeat" ? <button className="record" disabled={scoring} onClick={() => void toggleRecording()} type="button">{recording ? <X /> : <Mic />}<span>{scoring ? "评分中" : recording ? "完成" : "跟读"}</span></button> : <button className="record" onClick={() => void playWholePage()} type="button">{playing ? <Pause /> : <Play />}<span>{playing ? "暂停" : officialAudio ? "原音读本页" : "听本页"}</span></button>}</div>{recordingError ? <p className="picture-book-recording-error">{recordingError}</p> : <p>{officialAudio ? "本页优先使用资源提供的官方原音；逐句听读使用英语合成语音。" : "当前绘本没有官方英语原音，逐句与整页听读使用英语合成语音。"}</p>}</div> : <div className="picture-book-page-pause"><BookOpen /><strong>{page.kind === "cover" ? "翻页开始故事" : "这一页没有文字"}</strong><p>{page.kind === "cover" ? book.summary : "让学生先观察画面，再进入下一页。"}</p></div>}
+        {activeSentence ? <div className={`picture-book-action-card ${recording ? "recording" : ""}`}><div><small>{recording ? "正在听你读…" : scoring ? "正在认真评分…" : playing ? "正在播放读音" : activeAttempt ? `历史最高 ${Math.round(Number(activeAttempt.result?.SuggestedScore || 0))} 分${activeAttempt.passed ? " · 已通过" : " · 再试一次"}` : "准备好了吗？"}</small><strong>{activeSentence.text}</strong></div><div className="picture-book-actions"><button className="listen" disabled={recording || scoring} onClick={() => void playSentence(lineIndex)} type="button">{playing ? <Pause /> : <Volume2 />}<span>{playing ? "暂停" : "听读音"}</span></button>{mode === "repeat" ? <button className="record" disabled={scoring} onClick={() => void toggleRecording()} type="button">{recording ? <X /> : <Mic />}<span>{scoring ? "评分中" : recording ? "完成" : "跟读"}</span></button> : <button className="record" onClick={() => void playWholePage()} type="button">{playing ? <Pause /> : <Play />}<span>{playing ? "暂停" : officialAudio ? "原音读本页" : "听本页"}</span></button>}</div>{recordingError ? (typeof recordingError === "string" ? <p className="picture-book-recording-error">{recordingError}</p> : <PracticeIssueNotice issue={recordingError} className="picture-book-recording-error" />) : <p>{officialAudio ? "本页优先使用资源提供的官方原音；逐句听读使用英语合成语音。" : "当前绘本没有官方英语原音，逐句与整页听读使用英语合成语音。"}</p>}</div> : <div className="picture-book-page-pause"><BookOpen /><strong>{page.kind === "cover" ? "翻页开始故事" : "这一页没有文字"}</strong><p>{page.kind === "cover" ? book.summary : "让学生先观察画面，再进入下一页。"}</p></div>}
         <div className="picture-book-attribution"><strong>作品署名</strong><p>{book.license.attribution}</p>{book.source.url ? <a href={book.source.url} rel="noreferrer" target="_blank">查看官方来源</a> : <span>{book.source.name}</span>}<span> · </span>{book.license.url ? <a href={book.license.url} rel="noreferrer" target="_blank">{book.license.code}</a> : <span>{book.license.code}</span>}</div>
       </aside>
     </section>

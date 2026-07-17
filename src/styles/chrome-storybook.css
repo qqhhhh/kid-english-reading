@@ -165,8 +165,12 @@ html[data-design-chrome="storybook"] .child-left-rail {
   position: static;
   height: auto;
   min-height: 0;
+  min-width: 0;
   max-height: 100%;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  container-name: practice-rail;
+  container-type: inline-size;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   border-right: 3px solid var(--rl-line);
@@ -248,10 +252,12 @@ html[data-design-chrome="storybook"] .task-status-tabs {
 /* ---- Practice book cards (mockup .book-item) ---- */
 html[data-design-chrome="storybook"] .practice-book-tree {
   gap: 10px;
+  min-width: 0;
 }
 
 html[data-design-chrome="storybook"] .practice-book-tree-section {
   gap: 8px;
+  min-width: 0;
 }
 
 /* Mockup book card: cover | title+count | chevron, progress under title */
@@ -373,6 +379,7 @@ html[data-design-chrome="storybook"] .practice-book-mini .ui-progress > i {
 html[data-design-chrome="storybook"] .practice-book-lesson-list {
   padding-left: 4px;
   gap: 4px;
+  min-width: 0;
 }
 
 html[data-design-chrome="storybook"] .practice-book-lesson-list::before {
@@ -502,6 +509,16 @@ html[data-design-chrome="storybook"] .practice-section-tree {
   margin-left: 8px;
   padding-left: 4px;
   gap: 4px;
+  min-width: 0;
+}
+
+html[data-design-chrome="storybook"] .practice-course-tree-node,
+html[data-design-chrome="storybook"] .practice-chapter-node,
+html[data-design-chrome="storybook"] .practice-section-node,
+html[data-design-chrome="storybook"] .practice-section-heading,
+html[data-design-chrome="storybook"] .practice-section-label-row,
+html[data-design-chrome="storybook"] .practice-sentence-tree {
+  min-width: 0;
 }
 
 html[data-design-chrome="storybook"] .practice-chapter-toggle,
@@ -635,6 +652,31 @@ html[data-design-chrome="storybook"] .practice-sentence-tree {
   margin-left: 6px;
 }
 
+@container practice-rail (max-width: 340px) {
+  html[data-design-chrome="storybook"] .practice-books-card,
+  html[data-design-chrome="storybook"] .merged-practice-card {
+    padding-inline: 8px;
+  }
+
+  html[data-design-chrome="storybook"] .practice-course-outline,
+  html[data-design-chrome="storybook"] .practice-section-tree {
+    margin-left: 3px;
+    padding-left: 2px;
+  }
+
+  html[data-design-chrome="storybook"] .practice-sentence-tree {
+    margin-left: 2px;
+    padding-left: 2px;
+  }
+
+  html[data-design-chrome="storybook"] .task-preview-row,
+  html[data-design-chrome="storybook"] .practice-chapter-toggle,
+  html[data-design-chrome="storybook"] .practice-section-toggle {
+    gap: 7px;
+    padding-inline: 9px;
+  }
+}
+
 html[data-design-chrome="storybook"] .practice-sentence-tree-item {
   display: flex;
   align-items: center;
@@ -752,10 +794,10 @@ html[data-design-chrome="storybook"] .sb-reading-pane.child-reading-stage {
     min-width: 0;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
-    overflow: hidden;
+    overflow: visible;
   }
 
-  html[data-design-chrome="storybook"] .sb-stage-toolbar select {
+  html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-trigger {
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -805,6 +847,50 @@ html[data-design-chrome="storybook"] .sb-stage-toolbar .compact-voice-picker {
   font-size: 12px;
   min-height: 40px;
   color: var(--rl-ink);
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-trigger {
+  min-height: 36px;
+  color: var(--rl-ink);
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-menu {
+  gap: 4px;
+  padding: 7px;
+  border: 2px solid var(--rl-line);
+  border-radius: 18px;
+  background: var(--rl-white);
+  box-shadow: 0 7px 0 rgba(89, 77, 196, 0.12), 0 18px 34px rgba(26, 35, 50, 0.14);
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-option {
+  border-width: 2px;
+  border-radius: 13px;
+  padding: 8px 10px;
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-option:hover,
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-option:focus-visible {
+  border-color: color-mix(in srgb, var(--rl-selection-line) 70%, var(--rl-line));
+  background: var(--rl-selection-bg);
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-option.selected {
+  border-color: var(--rl-selection-line);
+  background: linear-gradient(180deg, #fff, var(--rl-selection-bg));
+  box-shadow: inset 3px 0 0 var(--rl-selection);
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-option strong {
+  color: var(--rl-ink);
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-option small {
+  color: var(--rl-ink-soft);
+}
+
+html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-check {
+  color: var(--rl-selection-deep);
 }
 
 /* Stage bubble */
@@ -2284,10 +2370,10 @@ html[data-design-chrome="storybook"] .settings-row--theme .ui-theme-switcher-gro
   html[data-design-chrome="storybook"] .sb-stage-toolbar .compact-voice-picker {
     width: 100%;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
-  html[data-design-chrome="storybook"] .sb-stage-toolbar select {
+  html[data-design-chrome="storybook"] .sb-stage-toolbar .voice-picker-trigger {
     width: 100%;
     min-width: 0;
   }

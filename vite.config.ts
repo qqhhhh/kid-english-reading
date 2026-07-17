@@ -74,10 +74,13 @@ export default defineConfig({
   ],
   server: {
     watch: {
-      ignored: ["**/tmp/**"]
+      ignored: ["**/tmp/**", "**/.tmp-build/**", "**/.server-build/**", "**/server/data/**", "**/dist/**"]
     },
     proxy: {
-      "/api": process.env.KID_READING_API_PROXY || "http://127.0.0.1:4175"
+      "/api": {
+        target: process.env.KID_READING_API_PROXY || "http://127.0.0.1:4175",
+        ws: true
+      }
     }
   }
 });
