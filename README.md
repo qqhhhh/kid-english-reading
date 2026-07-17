@@ -36,6 +36,61 @@ This repository contains source code only. It intentionally does **not** include
 You are responsible for ensuring that content imported into your installation is
 licensed for your use.
 
+## Built with Codex and GPT-5.6
+
+Kid English Reading was developed from the initial family conversation through
+the OpenAI Build Week submission with **Codex** as the engineering workspace and
+**GPT-5.6** as the reasoning and coding model. Their role was in the development
+process; the released application does not require Codex or call GPT-5.6 at
+runtime.
+
+### How Codex was used
+
+Codex provided the repository-aware workflow used to build and maintain the
+project. It was used to:
+
+- inspect the existing React, Express, WebSocket, SQLite, and test code before
+  making changes;
+- turn product decisions into scoped implementation plans and keep private
+  family data separate from the source-only public edition;
+- edit the full stack, run local development services, inspect browser behavior,
+  and diagnose integration failures;
+- execute type checking, automated tests, production builds, and diff checks
+  after changes; and
+- review the final public repository and create the Build Week demonstration
+  video without exposing credentials, recordings, textbooks, or family data.
+
+### How GPT-5.6 was used
+
+GPT-5.6 supplied the reasoning and code-generation capabilities inside that
+workflow. It helped translate a parent's practical requirements into technical
+behavior, including:
+
+- designing the parent-to-child learning loop, device pairing, and household
+  isolation model;
+- migrating the browser and server code to strict TypeScript and strengthening
+  shared API boundaries;
+- debugging `AudioWorklet` capture, voice activity detection, 40 ms PCM streaming,
+  WebSocket final-result identity, and the single full-recording fallback;
+- defining scoring invariants so silence, incomplete readings, or a missed
+  required word cannot be hidden by a high average score;
+- building the deterministic PDF layout, local OCR comparison, quality-gate, and
+  human-review pipeline for messy textbook pages; and
+- expanding regression coverage to 144 automated tests while hardening
+  authentication, child-device access, recording privacy, and provider error
+  handling.
+
+The repeated development loop was:
+
+1. define the observable behavior and safety boundary;
+2. inspect the relevant implementation and data flow with Codex;
+3. use GPT-5.6 to reason about and implement a focused change;
+4. run type checks, tests, builds, and targeted browser verification; and
+5. inspect the diff and refine the result before committing.
+
+Watch the [OpenAI Build Week demonstration video](https://youtu.be/wOXfG1ai3bk)
+for the product story and a short walkthrough of this development process.
+
 ## Requirements
 
 - Node.js 22.5 or newer
