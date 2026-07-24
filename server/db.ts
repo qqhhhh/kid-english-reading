@@ -294,6 +294,13 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
 db.exec("PRAGMA foreign_keys = ON;");
 db.exec("PRAGMA journal_mode = WAL;");
+let databaseClosed = false;
+
+export function closeDatabase(): void {
+  if (databaseClosed) return;
+  db.close();
+  databaseClosed = true;
+}
 
 function nowIso() {
   return new Date().toISOString();

@@ -185,7 +185,7 @@ export function ServerPlatformAdminPage() {
   return (
     <main className="platform-admin-page">
       <header className="platform-admin-header">
-        <div><ShieldCheck size={28} /><span><small>qiangzihang.com</small><strong>平台课程管理</strong></span></div>
+        <div><ShieldCheck size={28} /><span><small>平台服务器</small><strong>平台课程管理</strong></span></div>
         <nav>
           <a href="/parent"><ArrowLeft size={16} />家长端</a>
           {isLocalHost ? <a href="/local-course-studio"><Cpu size={16} />本机课程制作</a> : null}
@@ -238,7 +238,7 @@ export function ServerPlatformAdminPage() {
 
       <section className="platform-admin-grid is-platform-console">
         <section className="platform-resource-panel">
-          <div className="platform-panel-heading"><span><BookOpen size={20} /></span><div><small>qiangzihang.com 当前资源</small><h1>已发布课程</h1></div></div>
+          <div className="platform-panel-heading"><span><BookOpen size={20} /></span><div><small>当前服务器资源</small><h1>已发布课程</h1></div></div>
           {resources.length === 0 ? <p className="platform-empty">服务器还没有正式课程。</p> : <div className="platform-resource-list">{resources.map((resource) => (
             <article className={resource.status === "unpublished" ? "is-unpublished" : ""} key={resource.id}>
               <div><small>{resource.sourceLabel}</small><h2>{resource.title}</h2><p>{resource.description}</p></div>

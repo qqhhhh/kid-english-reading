@@ -1,4 +1,4 @@
-import type { Server } from "node:http";
+import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
 import { nanoid } from "nanoid";
 import { WebSocket, WebSocketServer } from "ws";
@@ -64,6 +64,10 @@ export interface LiveSpeechPrimaryResult {
   audio: Buffer;
 }
 
+export interface LiveSpeechServerAttachment {
+  close(): Promise<void>;
+}
+
 type LiveSpeechIdentity = Pick<LiveSpeechTicket, "runId" | "householdId" | "childId" | "sentenceId">;
 
 const tickets = new Map<string, LiveSpeechTicket>();
@@ -71,7 +75,7 @@ const results = new Map<string, StoredLiveSpeechResult>();
 const failures = new Map<string, FailedLiveSpeechResult>();
 const resultWaiters = new Map<string, Set<() => void>>();
 const activeRuns = new Map<string, LiveSpeechIdentity & { cancel: (reason: string) => void }>();
-const attachedServers = new WeakSet<Server>();
+const attachedServers = new WeakMap<Server, LiveSpeechServerAttachment>();
 const ticketTtlMs = 60_000;
 const resultTtlMs = 10 * 60_000;
 
@@ -324,12 +328,12 @@ function rejectUpgrade(socket: Duplex, status = "401 Unauthorized") {
   socket.destroy();
 }
 
-export function attachLiveSpeechServer(server: Server) {
-  if (attachedServers.has(server)) return;
-  attachedServers.add(server);
+export function attachLiveSpeechServer(server: Server): LiveSpeechServerAttachment {
+  const existingAttachment = attachedServers.get(server);
+  if (existingAttachment) return existingAttachment;
   const webSocketServer = new WebSocketServer({ noServer: true, maxPayload: 128 * 1024 });
 
-  server.on("upgrade", (request, socket, head) => {
+  const handleUpgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     let url: URL;
     try {
       url = new URL(request.url || "/", "http://localhost");
@@ -353,7 +357,38 @@ export function attachLiveSpeechServer(server: Server) {
     webSocketServer.handleUpgrade(request, socket, head, (client) => {
       handleLiveSpeechConnection(client, ticket);
     });
-  });
+  };
+  server.on("upgrade", handleUpgrade);
+
+  let closePromise: Promise<void> | null = null;
+  const attachment: LiveSpeechServerAttachment = {
+    close() {
+      if (closePromise) return closePromise;
+      closePromise = new Promise<void>((resolve) => {
+        server.off("upgrade", handleUpgrade);
+        let completed = false;
+        const complete = () => {
+          if (completed) return;
+          completed = true;
+          attachedServers.delete(server);
+          resolve();
+        };
+        const terminateTimer = setTimeout(() => {
+          for (const client of webSocketServer.clients) client.terminate();
+        }, 500);
+        const completionTimer = setTimeout(complete, 1_500);
+        for (const client of webSocketServer.clients) client.close(1001, "server-shutdown");
+        webSocketServer.close(() => {
+          clearTimeout(terminateTimer);
+          clearTimeout(completionTimer);
+          complete();
+        });
+      });
+      return closePromise;
+    }
+  };
+  attachedServers.set(server, attachment);
+  return attachment;
 }
 
 function handleLiveSpeechConnection(client: WebSocket, ticket: LiveSpeechTicket) {

@@ -11,6 +11,7 @@ import {
   addLessonToPracticeBook,
   archivePracticeBookItem,
   assignLessonToChild,
+  closeDatabase,
   createChild,
   createAutomaticPracticeSession,
   createPlatformAdminAuditLog,
@@ -127,6 +128,8 @@ import {
   registerSecurityAndAuthRoutes,
   requireLocalCourseStudio
 } from "./http/authRoutes.js";
+import { assignRequestId, handleHttpError } from "./http/errorHandler.js";
+import { configureTrustedProxy } from "./http/trustedProxy.js";
 import {
   createChildPairingCode,
   createRegistrationKey,
@@ -159,12 +162,15 @@ import {
   waitForLiveSpeechResult
 } from "./liveSpeech.js";
 import type { LiveSpeechTestComparison } from "./liveSpeech.js";
+import { startApplicationServer } from "./runtime.js";
 
 loadEnvFile();
 initDatabase();
 
 const __filename = fileURLToPath(import.meta.url);
 const app = express();
+configureTrustedProxy(app);
+app.use(assignRequestId);
 const port = Number(process.env.PORT || 4174);
 const host = process.env.HOST || "127.0.0.1";
 const speechProvider = process.env.SPEECH_PROVIDER || "mock";
@@ -3817,16 +3823,31 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(error);
-  res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
-});
+app.use(handleHttpError);
+
+function startKidReadingServer({
+  port: listenPort,
+  host: listenHost,
+  label = "API"
+}: {
+  port: number;
+  host: string;
+  label?: string;
+}) {
+  return startApplicationServer({
+    app,
+    port: listenPort,
+    host: listenHost,
+    attachServer: attachLiveSpeechServer,
+    cleanup: closeDatabase,
+    onListening() {
+      console.log(`Kid English Reading ${label} listening on http://${listenHost}:${listenPort}`);
+    }
+  });
+}
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
-  const server = app.listen(port, host, () => {
-    console.log(`Kid English Reading API listening on http://${host}:${port}`);
-  });
-  attachLiveSpeechServer(server);
+  startKidReadingServer({ port, host });
 }
 
 export {
@@ -3835,5 +3856,6 @@ export {
   buildProgress,
   buildPdfImportChaptersFromStructure,
   buildPdfStructureFromLayout,
-  mergePepReadingParagraphs
+  mergePepReadingParagraphs,
+  startKidReadingServer
 };

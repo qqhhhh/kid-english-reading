@@ -154,8 +154,23 @@ test("course sync rejects oversized requests from headers before reading a body"
   assert.equal((JSON.parse(result.body) as ErrorResponse).error, "COURSE_SYNC_PACKAGE_TOO_LARGE");
 });
 
-test("course sync rate limits repeated invalid senders and CORS does not trust arbitrary origins", async (context) => {
+test("course sync blocks untrusted browser origins before processing and rate limits direct senders", async (context) => {
   const port = await startServer(context);
+  const untrustedOriginResponse = await fetch(`http://127.0.0.1:${port}/api/course-sync/packages`, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer invalid-key-with-enough-characters",
+      "Content-Type": "application/octet-stream",
+      "Content-Length": "1",
+      "X-Course-Key-Id": "primary",
+      Origin: "https://evil.example"
+    },
+    body: "x"
+  });
+  assert.equal(untrustedOriginResponse.status, 403);
+  assert.equal(untrustedOriginResponse.headers.get("access-control-allow-origin"), null);
+  assert.equal((await responseJson<ErrorResponse>(untrustedOriginResponse)).error, "REQUEST_ORIGIN_NOT_ALLOWED");
+
   const statuses: number[] = [];
   for (let index = 0; index < 13; index += 1) {
     const response = await fetch(`http://127.0.0.1:${port}/api/course-sync/packages`, {
@@ -165,13 +180,11 @@ test("course sync rate limits repeated invalid senders and CORS does not trust a
         "Content-Type": "application/octet-stream",
         "Content-Length": "1",
         "X-Course-Key-Id": "primary",
-        "X-Forwarded-For": "203.0.113.30",
-        Origin: "https://evil.example"
+        "X-Forwarded-For": "203.0.113.30"
       },
       body: "x"
     });
     statuses.push(response.status);
-    assert.equal(response.headers.get("access-control-allow-origin"), null);
   }
   assert.deepEqual(statuses.slice(0, 12), Array(12).fill(401));
   assert.equal(statuses[12], 429);

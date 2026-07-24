@@ -22,9 +22,9 @@ interface ErrorResponse {
 
 process.env.KID_READING_DB_PATH = ":memory:";
 process.env.NODE_ENV = "production";
-process.env.AUTH_COOKIE_DOMAIN = ".qiangzihang.com";
-process.env.PRIMARY_AUTH_HOSTS = "qiangzihang.com,www.qiangzihang.com";
-process.env.PRIMARY_AUTH_ORIGIN = "https://www.qiangzihang.com";
+process.env.AUTH_COOKIE_DOMAIN = ".example.com";
+process.env.PRIMARY_AUTH_HOSTS = "example.com,www.example.com";
+process.env.PRIMARY_AUTH_ORIGIN = "https://www.example.com";
 
 const { app } = await import("../server/index.js");
 const {
@@ -58,7 +58,7 @@ test("production session cookies are shared across the configured domain", () =>
   assert.equal(parentCookies.length, 2);
   assert.doesNotMatch(parentCookies[0], /Domain=/);
   assert.match(parentCookies[0], /Max-Age=0/);
-  assert.match(parentCookies[1], /Domain=\.qiangzihang\.com/);
+  assert.match(parentCookies[1], /Domain=\.example\.com/);
   assert.match(parentCookies[1], /; Secure/);
 
   const childHeaders: string[] = [];
@@ -66,7 +66,7 @@ test("production session cookies are shared across the configured domain", () =>
   assert.equal(childHeaders.length, 2);
   assert.doesNotMatch(childHeaders[0], /Domain=/);
   assert.match(childHeaders[0], /Max-Age=0/);
-  assert.match(childHeaders[1], /Domain=\.qiangzihang\.com/);
+  assert.match(childHeaders[1], /Domain=\.example\.com/);
   assert.match(childHeaders[1], /; Secure/);
 });
 
@@ -96,19 +96,19 @@ test("an unauthenticated secondary hostname redirects HTML navigation to the pri
   const secondary = await requestWithHost({
     port,
     path: "/practice?lesson=1",
-    host: "learn.qiangzihang.com",
+    host: "learn.example.com",
     accept: "text/html"
   });
   assert.equal(secondary.status, 302);
   assert.equal(
     secondary.headers.location,
-    "https://www.qiangzihang.com/login?next=%2Fpractice%3Flesson%3D1"
+    "https://www.example.com/login?next=%2Fpractice%3Flesson%3D1"
   );
 
   const primary = await requestWithHost({
     port,
     path: "/practice",
-    host: "www.qiangzihang.com",
+    host: "www.example.com",
     accept: "text/html"
   });
   assert.notEqual(primary.status, 302);
@@ -116,7 +116,7 @@ test("an unauthenticated secondary hostname redirects HTML navigation to the pri
   const api = await requestWithHost({
     port,
     path: "/api/auth/session",
-    host: "learn.qiangzihang.com",
+    host: "learn.example.com",
     accept: "application/json"
   });
   assert.equal(api.status, 200);
@@ -128,20 +128,20 @@ test("production admin navigation is protected before the application shell is s
   context.after(() => new Promise((resolve) => server.close(resolve)));
   const port = listeningPort(server);
 
-  const unauthenticated = await requestWithHost({ port, path: "/admin", host: "www.qiangzihang.com", accept: "text/html" });
+  const unauthenticated = await requestWithHost({ port, path: "/admin", host: "www.example.com", accept: "text/html" });
   assert.equal(unauthenticated.status, 302);
-  assert.equal(unauthenticated.headers.location, "https://www.qiangzihang.com/login?next=%2Fadmin");
+  assert.equal(unauthenticated.headers.location, "https://www.example.com/login?next=%2Fadmin");
 
   const key = createRegistrationKey({ label: "admin page protection" }).key;
   const user = await registerParent({ registrationKey: key, username: "admin_guard_parent", password: "admin-guard-password", householdName: "Guard household" });
   const session = createParentSession(user.id);
   const cookie = `kid_parent_session=${encodeURIComponent(session.token)}`;
-  const ordinaryParent = await requestWithHost({ port, path: "/admin", host: "www.qiangzihang.com", accept: "text/html", cookie });
+  const ordinaryParent = await requestWithHost({ port, path: "/admin", host: "www.example.com", accept: "text/html", cookie });
   assert.equal(ordinaryParent.status, 302);
   assert.equal(ordinaryParent.headers.location, "/parent");
 
   process.env.PLATFORM_ADMIN_USERNAMES = "admin_guard_parent";
-  const administrator = await requestWithHost({ port, path: "/admin", host: "www.qiangzihang.com", accept: "text/html", cookie });
+  const administrator = await requestWithHost({ port, path: "/admin", host: "www.example.com", accept: "text/html", cookie });
   assert.equal(administrator.status, 200);
   const unverifiedMutation = await fetch(`http://127.0.0.1:${port}/api/platform-admin/registration-keys/batch`, {
     method: "POST",

@@ -21,7 +21,7 @@ feedback, scoring diagnostics, and a public in-memory product demo.
   quality reports, and a human review workflow.
 - A parent diagnostics workspace for recordings, device metadata, provider results,
   and human calibration labels.
-- 144 automated tests plus multi-device browser layout checks.
+- 149 automated tests plus multi-device browser layout checks.
 
 ## Open-source edition
 
@@ -76,7 +76,7 @@ behavior, including:
   required word cannot be hidden by a high average score;
 - building the deterministic PDF layout, local OCR comparison, quality-gate, and
   human-review pipeline for messy textbook pages; and
-- expanding regression coverage to 144 automated tests while hardening
+- expanding regression coverage to 149 automated tests while hardening
   authentication, child-device access, recording privacy, and provider error
   handling.
 
@@ -157,11 +157,25 @@ release; the project does not claim to call the OpenAI API at runtime.
 ## Validation
 
 ```powershell
-npm run typecheck
-npm run build
-npm test
+npm run verify
+npm run security:prod
 git diff --check
 ```
+
+## Production hardening
+
+Use `.env.production.example` as a starting point for an internet-facing
+installation. Keep the real `.env` untracked and configure exact HTTPS browser
+origins with `CORS_ALLOWED_ORIGINS`.
+
+When Express is behind a reverse proxy on the same machine, set
+`HTTP_TRUST_PROXY=loopback`. Never set it to `true` or `1`; unrestricted proxy
+trust allows clients to spoof forwarding headers and defeats per-client limits.
+
+The example systemd unit at `deploy/kid-english-reading.service.example` adds a
+private temporary directory, a read-only filesystem, a restricted write path for
+`server/data/`, a private umask, and a bounded graceful shutdown. Adapt its user
+and paths to the installation before enabling it.
 
 ## Data and privacy
 

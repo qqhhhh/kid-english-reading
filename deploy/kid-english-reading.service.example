@@ -1,0 +1,24 @@
+[Unit]
+Description=Kid English Reading
+After=network.target
+
+[Service]
+Type=simple
+User=kidreading
+WorkingDirectory=/opt/kid-english-reading
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/kid-english-reading/.env
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/kid-english-reading/server/data
+
+[Install]
+WantedBy=multi-user.target

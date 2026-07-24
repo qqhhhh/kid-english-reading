@@ -17,11 +17,8 @@ process.env.SPEECH_ENHANCEMENT_AB ||= "1";
 process.env.LOCAL_COURSE_STUDIO_ENABLED ||= "1";
 process.env.TENCENT_STREAMING_ENABLED ||= "1";
 
-const { app, attachLiveSpeechServer } = await import("./index.js");
+const { startKidReadingServer } = await import("./index.js");
 const port = Number(process.env.PORT);
 const host = process.env.HOST;
 
-const server = app.listen(port, host, () => {
-  console.log(`Kid English Reading development API listening on http://${host}:${port}`);
-});
-attachLiveSpeechServer(server);
+startKidReadingServer({ port, host, label: "development API" });

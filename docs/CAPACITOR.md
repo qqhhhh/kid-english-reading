@@ -7,7 +7,7 @@
 - 现有 React + Vite 页面可以直接复用为 Capacitor WebView 内容。
 - Android 需要 JDK 21、Android Studio 与 Android SDK；本机当前只有 `adb`，环境不完整。
 - iOS 必须使用 macOS、Xcode 和 Apple Developer 配置，不能在当前 Windows 机器完成签名构建。
-- 当前前端 API 使用 `/api` 相对路径。打包本地静态资源前，需要使用 `qiangzihang.com` 域名体系下的稳定 HTTPS API 地址。
+- 当前前端 API 使用 `/api` 相对路径。打包本地静态资源前，需要使用部署者自己的稳定 HTTPS API 地址。
 
 ## 两种验证方式
 

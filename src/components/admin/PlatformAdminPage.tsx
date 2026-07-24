@@ -448,7 +448,7 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
   return (
     <main className="platform-admin-page">
       <header className="platform-admin-header">
-        <div>{isLocalStudio ? <Cpu size={28} /> : <ShieldCheck size={28} />}<span><small>{isLocalStudio ? "仅限本机管理员" : "qiangzihang.com"}</small><strong>{isLocalStudio ? "课程制作工作台" : "平台课程管理"}</strong></span></div>
+        <div>{isLocalStudio ? <Cpu size={28} /> : <ShieldCheck size={28} />}<span><small>{isLocalStudio ? "仅限本机管理员" : "平台服务器"}</small><strong>{isLocalStudio ? "课程制作工作台" : "平台课程管理"}</strong></span></div>
         <nav>
           <a href={isLocalStudio ? "/admin" : "/parent"}><ArrowLeft size={16} />{isLocalStudio ? "平台管理" : "家长端"}</a>
           {!isLocalStudio && ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname) ? <a href="/local-course-studio"><Cpu size={16} />本机课程制作</a> : null}
@@ -463,7 +463,7 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
           <span><CloudUpload size={20} /></span>
           <div>
             <small>{isLocalStudio ? "本机审核 · HTTPS 交付" : "服务器接收 · 管理员确认"}</small>
-            <h2>{isLocalStudio ? "qiangzihang.com 发布通道" : "课程服务器草稿箱"}</h2>
+            <h2>{isLocalStudio ? "课程服务器发布通道" : "课程服务器草稿箱"}</h2>
             <p>{courseSyncStatus?.message || "正在检查课程同步配置…"}</p>
           </div>
           {courseSyncStatus?.targetEnabled && <b>{courseSyncStatus.secure ? "HTTPS + HMAC" : "本地调试 + HMAC"} · Key {courseSyncStatus.activeKeyId} · {courseSyncStatus.targetUrl}</b>}
@@ -524,7 +524,7 @@ export function PlatformAdminPage({ mode = "platform" }: { mode?: "platform" | "
           <label>版权或来源<input value={metadata.sourceLabel} onChange={(event) => setMetadata({ ...metadata, sourceLabel: event.target.value })} maxLength={100} required /></label>
           {error && <p className="platform-publish-inline-error" role="alert">{error}</p>}
           <div className="platform-publish-actions">
-            <Button type="submit" variant="primary" disabled={busy || uploading || courseSyncBusy || !preview?.importId || !courseSyncStatus?.targetEnabled}><CloudUpload size={18} />{courseSyncBusy ? "上传中…" : "上传到 qiangzihang.com 草稿箱"}</Button>
+            <Button type="submit" variant="primary" disabled={busy || uploading || courseSyncBusy || !preview?.importId || !courseSyncStatus?.targetEnabled}><CloudUpload size={18} />{courseSyncBusy ? "上传中…" : "上传到服务器草稿箱"}</Button>
           </div>
         </form> : null}
 

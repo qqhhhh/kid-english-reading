@@ -61,7 +61,7 @@ test("course sync keys are compared exactly and require a strong minimum length"
 
 test("course sync supports key rotation without exposing key values", () => {
   const configuration = getCourseSyncConfiguration({
-    COURSE_SYNC_TARGET_URL: "https://www.qiangzihang.com",
+    COURSE_SYNC_TARGET_URL: "https://reading.example.com",
     COURSE_SYNC_KEY_ID: "current",
     COURSE_SYNC_KEY: sharedKey,
     COURSE_SYNC_KEYS: "previous:previous-course-sync-key-123456789,current:ignored-duplicate-key-123456789"

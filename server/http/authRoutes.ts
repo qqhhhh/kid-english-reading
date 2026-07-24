@@ -4,6 +4,12 @@ import express from "express";
 import { nanoid } from "nanoid";
 import { createPlatformAdminAuditLog } from "../db.js";
 import { isFilingReviewSentenceText, sendFilingReviewReadModel } from "../filingReviewSandbox.js";
+import { createAuthRateLimit } from "./authRateLimit.js";
+import {
+  configuredCorsOrigins,
+  createTrustedMutationOriginGuard,
+  isAllowedCorsOrigin
+} from "./originPolicy.js";
 import {
   authenticateParent,
   clearChildSessionCookie,
@@ -40,42 +46,8 @@ export interface PlatformAdminAuditHandle {
   addMetadata(metadata?: Record<string, unknown>): void;
 }
 
-const authAttempts = new Map<string, number[]>();
 const filingReviewAttemptTimes = new Map<string, number[]>();
-
-function isAllowedCorsOrigin(origin: string | undefined): boolean {
-  if (!origin) return true;
-  const configured = new Set(
-    String(process.env.CORS_ALLOWED_ORIGINS || "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean)
-  );
-  if (configured.has(origin)) return true;
-  try {
-    const url = new URL(origin);
-    const loopback = ["http:", "https:"].includes(url.protocol)
-      && ["127.0.0.1", "localhost", "::1"].includes(url.hostname);
-    const productionDomain = url.protocol === "https:"
-      && (url.hostname === "qiangzihang.com" || url.hostname.endsWith(".qiangzihang.com"));
-    return loopback || productionDomain;
-  } catch {
-    return false;
-  }
-}
-
-function checkAuthRateLimit(request: Request, response: Response, next: NextFunction): void {
-  const key = request.ip || request.socket.remoteAddress || "unknown";
-  const now = Date.now();
-  const recent = (authAttempts.get(key) || []).filter((timestamp) => now - timestamp < 15 * 60 * 1000);
-  if (recent.length >= 12) {
-    response.status(429).json({ error: "AUTH_RATE_LIMITED" });
-    return;
-  }
-  recent.push(now);
-  authAttempts.set(key, recent);
-  next();
-}
+const checkAuthRateLimit = createAuthRateLimit();
 
 function reviewAttemptAllowed(request: Request): boolean {
   const key = request.ip || request.socket.remoteAddress || "unknown";
@@ -246,6 +218,7 @@ export function hasChildAccess(request: Request, childId: string): boolean {
 }
 
 export function registerSecurityAndAuthRoutes(app: Application): void {
+  const allowedCorsOrigins = configuredCorsOrigins();
   app.disable("x-powered-by");
 
   app.use((request, response, next) => {
@@ -276,10 +249,14 @@ export function registerSecurityAndAuthRoutes(app: Application): void {
   app.use(cors({
     credentials: true,
     origin(origin, callback) {
-      callback(null, isAllowedCorsOrigin(origin));
+      callback(null, isAllowedCorsOrigin(origin, process.env.NODE_ENV, allowedCorsOrigins));
     }
   }));
   app.use(express.json({ limit: "4mb" }));
+  app.use("/api", createTrustedMutationOriginGuard({
+    nodeEnv: process.env.NODE_ENV,
+    allowedOrigins: allowedCorsOrigins
+  }));
 
   app.get("/api/auth/session", (request, response) => {
     const session = readAccessSession(request);
